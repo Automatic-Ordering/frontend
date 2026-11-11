@@ -5,18 +5,21 @@ import { Button, Card, Input } from "../../components/ui";
 import { Header } from "../../components/layout";
 import { createStore } from "../../services/storeService";
 import { getApiError } from "../../services/api";
+
 export default function StoreCreate() {
-  const [form, setForm] = useState({ store_name: "", password: "" });
+  const [storeName, setStoreName] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
   const submit = async (e) => {
     e.preventDefault();
+    if (!storeName.trim()) return;
     setError("");
     setLoading(true);
     try {
-      const data = await createStore(form);
+      const data = await createStore({ store_name: storeName.trim() });
       setResult(data?.store || data);
     } catch (err) {
       setError(getApiError(err, "점포 등록에 실패했습니다."));
@@ -24,7 +27,11 @@ export default function StoreCreate() {
       setLoading(false);
     }
   };
+
   const code = result?.store_code || result?.code || result?.storeCode;
+  const initialPassword =
+    result?.initial_password || (code ? `Store${code}!` : "-");
+
   if (result)
     return (
       <>
@@ -48,8 +55,15 @@ export default function StoreCreate() {
           </div>
           <div className="credential">
             <span>초기 비밀번호</span>
-            <strong>{form.password}</strong>
-            <KeyRound size={17} />
+            <strong>{initialPassword}</strong>
+            <button
+              onClick={() =>
+                navigator.clipboard?.writeText(initialPassword || "")
+              }
+            >
+              <Copy size={16} />
+              복사
+            </button>
           </div>
           <div className="button-row">
             <Button
@@ -61,7 +75,7 @@ export default function StoreCreate() {
             <Button
               onClick={() => {
                 setResult(null);
-                setForm({ store_name: "", password: "" });
+                setStoreName("");
               }}
             >
               추가 등록
@@ -70,6 +84,7 @@ export default function StoreCreate() {
         </Card>
       </>
     );
+
   return (
     <>
       <Header
@@ -81,20 +96,13 @@ export default function StoreCreate() {
           <Input
             label="점포명"
             placeholder="예: 자동발주 강남점"
-            value={form.store_name}
-            onChange={(e) => setForm({ ...form, store_name: e.target.value })}
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
             required
           />
-          <Input
-            label="초기 비밀번호"
-            type="password"
-            placeholder="점포 담당자에게 전달할 비밀번호"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            minLength={8}
-          />
-          <p className="helper">점포 코드는 백엔드에서 자동으로 발급됩니다.</p>
+          <p className="helper">
+            점포 코드는 백엔드에서 5자리 숫자로 자동 발급됩니다.
+          </p>
           {error && <div className="alert alert-error">{error}</div>}
           <div className="button-row">
             <Button
