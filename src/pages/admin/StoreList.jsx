@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Badge, Card, EmptyState, Loading } from "../../components/ui";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
-import { getStores } from "../../services/storeService";
+import { getStoreId, getStores } from "../../services/storeService";
 export default function StoreList() {
   const [stores, setStores] = useState([]);
   const [query, setQuery] = useState("");
@@ -61,14 +61,18 @@ export default function StoreList() {
                   <th>점포 코드</th>
                   <th>운영 상태</th>
                   <th>생성 일자</th>
-                  <th />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((s) => (
-                  <tr key={s.id || s.storeId}>
+                  <tr key={getStoreId(s)}>
                     <td>
-                      <strong>{s.name || s.storeName || "-"}</strong>
+                      <Link
+                        className="text-link"
+                        to={`/admin/stores/${getStoreId(s)}`}
+                      >
+                        {s.name || s.storeName || "-"}
+                      </Link>
                     </td>
                     <td className="muted">{s.code || s.storeCode || "-"}</td>
                     <td>
@@ -88,15 +92,6 @@ export default function StoreList() {
                       {s.createdAt
                         ? new Date(s.createdAt).toLocaleDateString("ko-KR")
                         : "-"}
-                    </td>
-                    <td>
-                      <Link
-                        className="icon-btn"
-                        to={`/admin/stores/${s.id || s.storeId}`}
-                        aria-label="상세 보기"
-                      >
-                        <Eye size={17} />
-                      </Link>
                     </td>
                   </tr>
                 ))}

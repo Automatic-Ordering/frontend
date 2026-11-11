@@ -9,14 +9,15 @@ export default function LoginForm({ admin = false, initialRole }) {
   const defaultRole = initialRole || (admin ? 'ADMIN' : 'STORE')
   const [role, setRole] = useState(defaultRole)
   const [form, setForm] = useState(defaultRole === 'ADMIN' ? { admin_username: '', password: '' } : { storeCode: '', password: '' })
-  const [error, setError] = useState(''); const { login, loading } = useAuth(); const navigate = useNavigate(); const location = useLocation()
+  const [error, setError] = useState(''); const auth = useAuth(); const { login, loading } = auth || {}; const navigate = useNavigate(); const location = useLocation()
   const adminRole = role === 'ADMIN'
-  const credentialKey = adminRole ? 'admin_username' : 'storeCode'
+  const credentialKey = adminRole ? 'admin_username' : 'store_code'
   const handleRoleChange = (event) => {
     const nextRole = event.target.value
     setRole(nextRole)
-    setForm({ [nextRole === 'ADMIN' ? 'admin_username' : 'storeCode']: '', password: '' })
+    setForm({ [nextRole === 'ADMIN' ? 'admin_username' : 'store_code']: '', password: '' })
     setError('')
+    navigate(nextRole === 'ADMIN' ? '/admin/login' : '/login', { replace: true })
   }
   const submit = async (event) => {
     event.preventDefault(); setError('')

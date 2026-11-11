@@ -1,2 +1,4 @@
-import ProtectedRoute from './ProtectedRoute'
-export default function AdminRoute() { return <ProtectedRoute role="ADMIN" /> }
+import ProtectedRoute from "./ProtectedRoute";
+export default function AdminRoute() {
+  return <ProtectedRoute role="ADMIN" />;
+}

@@ -9,7 +9,7 @@ import {
   StatCard,
 } from "../../components/ui";
 import { Header } from "../../components/layout";
-import { getStores } from "../../services/storeService";
+import { getStoreId, getStores } from "../../services/storeService";
 import { getApiError } from "../../services/api";
 
 export default function AdminDashboard() {
@@ -72,8 +72,8 @@ export default function AdminDashboard() {
                   {stores.slice(0, 5).map((store) => (
                     <Link
                       className="mini-row"
-                      to={`/admin/stores/${store.id || store.storeId}`}
-                      key={store.id || store.storeId}
+                      to={`/admin/stores/${getStoreId(store)}`}
+                      key={getStoreId(store)}
                     >
                       <span className="avatar">
                         {(store.name || store.storeName || "점").slice(0, 1)}
