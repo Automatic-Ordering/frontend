@@ -8,6 +8,7 @@ import StoreCreate from "../pages/admin/StoreCreate";
 import StoreDetail from "../pages/admin/StoreDetail";
 import ProductList from "../pages/admin/ProductList";
 import StoreDashboard from "../pages/store/StoreDashboard";
+import StoreInventory from "../pages/store/StoreInventory";
 import StoreSettings from "../pages/store/StoreSettings";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminRoute from "./AdminRoute";
@@ -28,6 +29,7 @@ export default function AppRouter() {
       <Route element={<ProtectedRoute role="STORE" />}>
         <Route element={<StoreLayout />}>
           <Route path="/store" element={<StoreDashboard />} />
+          <Route path="/store/inventory" element={<StoreInventory />} />
           <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>

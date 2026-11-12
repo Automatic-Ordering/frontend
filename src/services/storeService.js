@@ -12,7 +12,8 @@ const normalizeStore = (store) =>
       }
     : store;
 
-export const getStoreId = (store) => store?.id ?? store?.store_id ?? store?.storeId;
+export const getStoreId = (store) =>
+  store?.id ?? store?.store_id ?? store?.storeId;
 
 const normalizeStores = (data) => {
   const stores = Array.isArray(data) ? data : data?.stores || [];

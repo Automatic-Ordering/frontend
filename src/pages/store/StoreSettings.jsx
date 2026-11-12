@@ -1,7 +1,102 @@
-import { useState } from 'react'
-import { Button, Card, Input } from '../../components/ui'
-import { Header } from '../../components/layout'
-import { useAuth } from '../../contexts/AuthContext'
-import { changePassword } from '../../services/authService'
-import { getApiError } from '../../services/api'
-export default function StoreSettings() { const { user } = useAuth(); const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' }); const [message, setMessage] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false); const submit = async (e) => { e.preventDefault(); setError(''); setMessage(''); if (form.newPassword !== form.confirmPassword) return setError('새 비밀번호가 일치하지 않습니다.'); setLoading(true); try { await changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword }); setMessage('비밀번호가 변경되었습니다.'); setForm({ currentPassword: '', newPassword: '', confirmPassword: '' }) } catch (err) { setError(getApiError(err, '비밀번호 변경에 실패했습니다.')) } finally { setLoading(false) } }; return <><Header title="점포 설정" description="점포 정보와 계정 보안을 관리하세요." /><div className="settings-grid"><Card><h2>점포 정보</h2><div className="info-list"><div><span>점포명</span><strong>{user?.name || user?.storeName || '-'}</strong></div><div><span>점포 코드</span><strong>{user?.code || user?.storeCode || '-'}</strong></div><div><span>운영 상태</span><strong className="status-text">운영 중</strong></div></div></Card><Card><h2>비밀번호 변경</h2><form onSubmit={submit}><Input label="현재 비밀번호" type="password" value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} required /><Input label="새 비밀번호" type="password" minLength={8} value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} required /><Input label="새 비밀번호 확인" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} required />{error && <div className="alert alert-error">{error}</div>}{message && <div className="alert alert-success">{message}</div>}<Button type="submit" loading={loading}>비밀번호 변경</Button></form></Card></div></> }
+import { useState } from "react";
+import { Button, Card, Input } from "../../components/ui";
+import { Header } from "../../components/layout";
+import { useAuth } from "../../contexts/AuthContext";
+import { changePassword } from "../../services/authService";
+import { getApiError } from "../../services/api";
+export default function StoreSettings() {
+  const { user } = useAuth();
+  const [form, setForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    if (form.newPassword !== form.confirmPassword)
+      return setError("새 비밀번호가 일치하지 않습니다.");
+    setLoading(true);
+    try {
+      await changePassword({
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword,
+      });
+      setMessage("비밀번호가 변경되었습니다.");
+      setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      setError(getApiError(err, "비밀번호 변경에 실패했습니다."));
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <>
+      <Header
+        title="점포 설정"
+        description="점포 정보와 계정 보안을 관리하세요."
+      />
+      <div className="settings-grid">
+        <Card>
+          <h2>점포 정보</h2>
+          <div className="info-list">
+            <div>
+              <span>점포명</span>
+              <strong>{user?.name || user?.storeName || "-"}</strong>
+            </div>
+            <div>
+              <span>점포 코드</span>
+              <strong>{user?.code || user?.storeCode || "-"}</strong>
+            </div>
+            <div>
+              <span>운영 상태</span>
+              <strong className="status-text">운영 중</strong>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <h2>비밀번호 변경</h2>
+          <form onSubmit={submit}>
+            <Input
+              label="현재 비밀번호"
+              type="password"
+              value={form.currentPassword}
+              onChange={(e) =>
+                setForm({ ...form, currentPassword: e.target.value })
+              }
+              required
+            />
+            <Input
+              label="새 비밀번호"
+              type="password"
+              minLength={8}
+              value={form.newPassword}
+              onChange={(e) =>
+                setForm({ ...form, newPassword: e.target.value })
+              }
+              required
+            />
+            <Input
+              label="새 비밀번호 확인"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(e) =>
+                setForm({ ...form, confirmPassword: e.target.value })
+              }
+              required
+            />
+            {error && <div className="alert alert-error">{error}</div>}
+            {message && <div className="alert alert-success">{message}</div>}
+            <Button type="submit" loading={loading}>
+              비밀번호 변경
+            </Button>
+          </form>
+        </Card>
+      </div>
+    </>
+  );
+}
