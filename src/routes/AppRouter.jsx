@@ -6,6 +6,7 @@ import AdminDashboard from "../pages/admin/AdminDashboard";
 import StoreList from "../pages/admin/StoreList";
 import StoreCreate from "../pages/admin/StoreCreate";
 import StoreDetail from "../pages/admin/StoreDetail";
+import ProductList from "../pages/admin/ProductList";
 import StoreDashboard from "../pages/store/StoreDashboard";
 import StoreSettings from "../pages/store/StoreSettings";
 import ProtectedRoute from "./ProtectedRoute";
@@ -21,6 +22,7 @@ export default function AppRouter() {
           <Route path="/admin/stores" element={<StoreList />} />
           <Route path="/admin/stores/new" element={<StoreCreate />} />
           <Route path="/admin/stores/:storeId" element={<StoreDetail />} />
+          <Route path="/admin/products" element={<ProductList />} />
         </Route>
       </Route>
       <Route element={<ProtectedRoute role="STORE" />}>
