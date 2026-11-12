@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Input } from "../../components/ui";
 import { Header } from "../../components/layout";
