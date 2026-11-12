@@ -35,4 +35,4 @@ export const updateStoreStatus = async (storeId, status) =>
 export const deleteStore = async (storeId) =>
   api.delete(`/admin/stores/${storeId}`);
 export const resetStorePassword = async (storeId) =>
-  unwrap(await api.patch(`/admin/stores/${storeId}/password/reset`));
+  unwrap(await api.patch(`/admin/stores/${storeId}/password/reset`));  
