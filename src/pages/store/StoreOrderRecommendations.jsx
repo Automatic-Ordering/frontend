@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ClipboardList,
@@ -16,7 +17,9 @@ import {
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
-import { confirmOrders, getRecommendations } from "../../services/orderService";
+import { getRecommendations } from "../../services/orderService";
+import { getProduct } from "../../services/productService";
+import { createOrderSpec } from "../../services/orderSpecService";
 
 const WARNING_LABELS = {
   NO_SALES_DATA: "판매 데이터 없음",
@@ -27,7 +30,18 @@ const WARNING_LABELS = {
 
 const PAGE_SIZE = 20;
 
+const calculateShortage = (targetStock, currentStock) => {
+  const shortage = targetStock - currentStock;
+  return shortage > 0 ? shortage : 0;
+};
+const handleSearch = () => {
+  loadRecommendations({ targetPage: page });
+};
+
+const calculateUndelivered = () => "-";
+
 export default function StoreOrderRecommendations() {
+  const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState([]);
   const [quantities, setQuantities] = useState({});
   const [loading, setLoading] = useState(true);
@@ -39,6 +53,7 @@ export default function StoreOrderRecommendations() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [productDetails, setProductDetails] = useState({});
 
   const loadRecommendations = ({
     targetPage = 1,
@@ -65,6 +80,26 @@ export default function StoreOrderRecommendations() {
         setTotalCount(Number(data.total ?? 0));
         setTotalPages(Number(data.total_pages ?? 0));
         setPage(Number(data.page ?? targetPage));
+
+        const productIdMap = items.reduce((map, item) => {
+          map[String(item.product_id)] = item.product_id;
+          return map;
+        }, {});
+        const productIds = Object.values(productIdMap);
+
+        if (productIds.length > 0) {
+          productIds.forEach((pid) => {
+            getProduct(pid).then((prod) => {
+              setProductDetails((prev) => ({
+                ...prev,
+                [String(pid)]: {
+                  supplier: prod.supplier || "-",
+                  unit: prod.unit || "-",
+                },
+              }));
+            });
+          });
+        }
       })
       .catch((err) =>
         setError(
@@ -78,11 +113,27 @@ export default function StoreOrderRecommendations() {
     loadRecommendations();
   }, []);
 
-  const handleSearch = () => {
-    setFormError("");
-    setSuccess("");
-    loadRecommendations({ targetPage: 1 });
-  };
+  useEffect(() => {
+    const productIdMap = recommendations.reduce((map, item) => {
+      map[String(item.product_id)] = item.product_id;
+      return map;
+    }, {});
+    const productIds = Object.values(productIdMap);
+
+    if (productIds.length > 0) {
+      productIds.forEach((pid) => {
+        getProduct(pid).then((prod) => {
+          setProductDetails((prev) => ({
+            ...prev,
+            [String(pid)]: {
+              supplier: prod.supplier || "-",
+              unit: prod.unit || "-",
+            },
+          }));
+        });
+      });
+    }
+  }, [recommendations]);
 
   const pendingItems = useMemo(
     () =>
@@ -132,7 +183,7 @@ export default function StoreOrderRecommendations() {
     );
     if (
       !window.confirm(
-        `총 ${pendingItems.length}개 상품 / ${totalQuantity.toLocaleString()}개 수량을 발주 확정하시겠습니까?`,
+        `총 ${pendingItems.length}개 상품 / ${totalQuantity.toLocaleString()}개 수량으로 발주 명세서를 생성하시겠습니까?`,
       )
     ) {
       return;
@@ -140,29 +191,21 @@ export default function StoreOrderRecommendations() {
 
     setSubmitting(true);
     try {
-      const created = await confirmOrders(pendingItems);
-      const confirmedIds = new Set(
-        (Array.isArray(created) ? created : []).map((order) =>
-          Number(order.product_id),
-        ),
-      );
-      setQuantities((prev) =>
-        Object.fromEntries(
-          Object.entries(prev).filter(
-            ([productId]) => !confirmedIds.has(Number(productId)),
-          ),
-        ),
-      );
-      setSuccess(
-        `${created.length}건의 발주가 등록되었습니다. (발주 대기 상태)`,
-      );
-      loadRecommendations({ targetPage: page });
+      const spec = await createOrderSpec(pendingItems);
+      navigate("/store/orders/specs", {
+        state: {
+          message: `발주 명세서(${spec.order_number})가 임시 저장되었습니다. 발주 내역 화면에서 검토 후 제출하세요.`,
+        },
+      });
     } catch (err) {
-      setFormError(getApiError(err, "발주 확정 중 오류가 발생했습니다."));
+      setFormError(
+        getApiError(err, "발주 명세서 생성 중 오류가 발생했습니다."),
+      );
     } finally {
       setSubmitting(false);
     }
   };
+
 
   return (
     <>
@@ -180,7 +223,9 @@ export default function StoreOrderRecommendations() {
         />
         <StatCard
           label={`발주 필요 상품 (현재 페이지)`}
-          value={recommendations.filter((item) => item.needs_order).length}
+          value={
+            recommendations.filter((item) => item.needs_order).length
+          }
           icon={ShoppingCart}
           tone="orange"
         />
@@ -232,7 +277,7 @@ export default function StoreOrderRecommendations() {
             loading={submitting}
             disabled={loading || !pendingItems.length}
           >
-            발주 확정
+            발주 명세서 생성
           </Button>
           <Button
             type="button"
@@ -271,47 +316,83 @@ export default function StoreOrderRecommendations() {
           </div>
         ) : recommendations.length ? (
           <div className="table-wrap">
-            <table>
+            <table style={{ width: "100%" }}>
               <thead>
                 <tr>
-                  <th>상품 코드</th>
-                  <th>상품명</th>
-                  <th>카테고리</th>
-                  <th style={{ textAlign: "right" }}>현재 재고</th>
-                  <th style={{ textAlign: "right" }}>예상 일일 판매량</th>
-                  <th style={{ textAlign: "right" }}>안전 재고</th>
-                  <th style={{ textAlign: "right" }}>목표 재고</th>
-                  <th style={{ textAlign: "right" }}>추천 발주량</th>
-                  <th style={{ textAlign: "center" }}>발주 수량</th>
-                  <th style={{ textAlign: "center" }}>데이터 상태</th>
+                  <th className="text-left font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    상품
+                  </th>
+                  <th className="text-left font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    공급업체
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    3일 합계
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    일평균
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    예상(3일)
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    안전재고
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    목표재고
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    현재고
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    미입고
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    부족량
+                  </th>
+                  <th className="text-left font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    단위
+                  </th>
+                  <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    권장
+                  </th>
+                  <th className="text-center font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    발주수량
+                  </th>
+                  <th className="text-center font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                    데이터 상태
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {recommendations.map((item) => {
+                  const productId = String(item.product_id);
+                  const pd = productDetails[productId] || {};
                   const hasWarning = item.data_warning.length > 0;
+                  const shortage = calculateShortage(
+                    Number(item.target_stock),
+                    Number(item.current_stock),
+                  );
+                  const undelivered = calculateUndelivered();
+
                   return (
                     <tr key={item.product_id}>
-                      <td className="muted" style={{ fontFamily: "monospace" }}>
-                        #{item.product_id}
+                      <td className="align-middle">
+                        <div className="font-medium">{item.product_name}</div>
+                        <div className="text-xs muted">#{item.product_id}</div>
                       </td>
-                      <td>
-                        <strong>{item.product_name}</strong>
+                      <td className="align-middle">
+                        <span className="text-xs">{pd.supplier || "-"}</span>
                       </td>
-                      <td>
-                        <span
-                          className="badge"
-                          style={{ background: "#f1f5f9", color: "#334155" }}
-                        >
-                          {item.category || "-"}
-                        </span>
+                      <td className="align-middle text-right">
+                        {Number(item.predicted_demand * 3).toLocaleString()}
                       </td>
-                      <td style={{ textAlign: "right" }}>
-                        {Number(item.current_stock).toLocaleString()}
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 600 }}>
+                      <td className="align-middle text-right">
                         {Number(item.predicted_demand).toFixed(2)}
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td className="align-middle text-right">
+                        {Number(item.predicted_demand * 3).toLocaleString()}
+                      </td>
+                      <td className="align-middle text-right">
                         {Number(item.applied_safety_stock).toLocaleString()}
                         {item.safety_stock_source === "CONFIGURED" && (
                           <small className="muted" style={{ display: "block" }}>
@@ -319,8 +400,20 @@ export default function StoreOrderRecommendations() {
                           </small>
                         )}
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td className="align-middle text-right">
                         {Number(item.target_stock).toLocaleString()}
+                      </td>
+                      <td className="align-middle text-right">
+                        {Number(item.current_stock).toLocaleString()}
+                      </td>
+                      <td className="align-middle text-right">
+                        {undelivered}
+                      </td>
+                      <td className="align-middle text-right">
+                        {Number(shortage).toLocaleString()}
+                      </td>
+                      <td className="align-middle">
+                        <span className="text-xs">{pd.unit || "-"}</span>
                       </td>
                       <td
                         style={{

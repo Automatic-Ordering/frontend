@@ -2,13 +2,17 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   Boxes,
   ClipboardList,
+  FilePlus2,
+  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
+  PackageCheck,
   Receipt,
   Settings,
   ShoppingCart,
+  SlidersHorizontal,
   Store,
   X,
 } from "lucide-react";
@@ -22,6 +26,8 @@ export function Sidebar({ admin = false }) {
   const links = admin
     ? [
         ["/admin", "대시보드", LayoutDashboard],
+        ["/admin/orders", "발주 승인 관리", ClipboardList],
+        ["/admin/orders/issued", "발주서 관리", FileText],
         ["/admin/stores", "점포 관리", Store],
         ["/admin/stores/new", "점포 등록", Store],
         ["/admin/products", "상품 관리", Package],
@@ -32,7 +38,10 @@ export function Sidebar({ admin = false }) {
         ["/store/sales", "판매 내역", Receipt],
         ["/store/sales/new", "판매 등록", Receipt],
         ["/store/orders/recommendations", "자동 발주", ShoppingCart],
-        ["/store/orders", "발주 이력", ClipboardList],
+        ["/store/order-settings", "발주 기준 설정", SlidersHorizontal],
+        ["/store/orders/specs/new", "명세서 작성", FilePlus2],
+        ["/store/orders/specs", "발주 내역", ClipboardList],
+        ["/store/orders/receipts", "입고 관리", PackageCheck],
         ["/store/settings", "점포 설정", Settings],
       ];
   const signOut = () => {

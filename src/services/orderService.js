@@ -51,3 +51,21 @@ export const getOrders = async ({ status, page, limit } = {}) => {
 export const getOrder = async (orderId) => {
   return unwrap(await api.get(`/store/orders/${orderId}`));
 };
+
+/**
+ * 점포 자동 발주 기준 설정 조회
+ * GET /api/store/order-settings
+ * 응답: { analysis_period_days, moving_average_days, moving_average_weight,
+ *        same_weekday_weight, service_factor, forecast_period_days, ... }
+ */
+export const getOrderSettings = async () => {
+  return unwrap(await api.get("/store/order-settings"));
+};
+
+/**
+ * 점포 자동 발주 기준 설정 수정
+ * PATCH /api/store/order-settings  body: { analysis_period_days, ... }
+ */
+export const updateOrderSettings = async (payload) => {
+  return unwrap(await api.patch("/store/order-settings", payload));
+};
