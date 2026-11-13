@@ -15,7 +15,13 @@ export const getSales = async ({ from, to, page, limit } = {}) => {
   if (limit) params.limit = limit;
   const data = unwrap(await api.get("/store/sales", { params }));
   if (Array.isArray(data)) {
-    return { items: data, total: data.length, page: 1, limit: data.length, total_pages: 1 };
+    return {
+      items: data,
+      total: data.length,
+      page: 1,
+      limit: data.length,
+      total_pages: 1,
+    };
   }
   return data;
 };

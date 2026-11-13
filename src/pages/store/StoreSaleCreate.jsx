@@ -30,9 +30,13 @@ export default function StoreSaleCreate() {
   const loadProducts = () => {
     setProductsError("");
     getStoreProducts()
-      .then((data) => setProducts(data.filter((product) => product.is_registered)))
+      .then((data) =>
+        setProducts(data.filter((product) => product.is_registered)),
+      )
       .catch((err) =>
-        setProductsError(getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다.")),
+        setProductsError(
+          getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."),
+        ),
       );
   };
 
@@ -99,7 +103,8 @@ export default function StoreSaleCreate() {
                 <option value="">상품을 선택하세요</option>
                 {products.map((product) => (
                   <option key={product.product_id} value={product.product_id}>
-                    {product.product_name} (재고 {Number(product.current_stock).toLocaleString()}개)
+                    {product.product_name} (재고{" "}
+                    {Number(product.current_stock).toLocaleString()}개)
                   </option>
                 ))}
               </select>
@@ -127,10 +132,17 @@ export default function StoreSaleCreate() {
             />
 
             {formError && <div className="alert alert-error">{formError}</div>}
-            {formMessage && <div className="alert alert-success">{formMessage}</div>}
+            {formMessage && (
+              <div className="alert alert-success">{formMessage}</div>
+            )}
 
             <div className="button-row">
-              <Button type="button" variant="secondary" onClick={() => navigate("/store/sales")} disabled={submitting}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => navigate("/store/sales")}
+                disabled={submitting}
+              >
                 판매 내역으로 이동
               </Button>
               <Button type="submit" loading={submitting}>

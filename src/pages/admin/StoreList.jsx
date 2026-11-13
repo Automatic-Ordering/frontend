@@ -4,7 +4,11 @@ import { Copy, KeyRound, Plus, Search } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Loading } from "../../components/ui";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
-import { getStoreId, getStores, resetStorePassword } from "../../services/storeService";
+import {
+  getStoreId,
+  getStores,
+  resetStorePassword,
+} from "../../services/storeService";
 
 export default function StoreList() {
   const [stores, setStores] = useState([]);
@@ -69,7 +73,8 @@ export default function StoreList() {
     setResetError("");
     try {
       const result = await resetStorePassword(getStoreId(resetTarget));
-      const pwd = result?.data?.temporaryPassword || result?.temporaryPassword || "";
+      const pwd =
+        result?.data?.temporaryPassword || result?.temporaryPassword || "";
       if (!pwd) {
         setResetError("응답에 임시 비밀번호가 없습니다. 다시 시도해 주세요.");
         return;
@@ -88,7 +93,9 @@ export default function StoreList() {
     if (!tempPassword) return;
     if (!navigator.clipboard?.writeText) {
       setCopied(false);
-      setCopyError("클립보드를 사용할 수 없습니다. 임시 비밀번호를 직접 선택해 복사해 주세요.");
+      setCopyError(
+        "클립보드를 사용할 수 없습니다. 임시 비밀번호를 직접 선택해 복사해 주세요.",
+      );
       return;
     }
     setCopyError("");
@@ -98,7 +105,9 @@ export default function StoreList() {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
-      setCopyError("복사에 실패했습니다. 임시 비밀번호를 직접 선택해 복사해 주세요.");
+      setCopyError(
+        "복사에 실패했습니다. 임시 비밀번호를 직접 선택해 복사해 주세요.",
+      );
     }
   };
 
@@ -222,19 +231,40 @@ export default function StoreList() {
                 <h3 style={{ margin: "0 0 16px", fontSize: "18px" }}>
                   비밀번호 초기화
                 </h3>
-                <p style={{ margin: "0 0 8px", color: "#334155", lineHeight: 1.6 }}>
-                  <strong>{resetTarget.name || resetTarget.storeName}</strong> 점포의
-                  비밀번호를 초기화하시겠습니까?
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    color: "#334155",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <strong>{resetTarget.name || resetTarget.storeName}</strong>{" "}
+                  점포의 비밀번호를 초기화하시겠습니까?
                 </p>
-                <p style={{ margin: "0 0 20px", color: "#94a3b8", fontSize: "14px" }}>
+                <p
+                  style={{
+                    margin: "0 0 20px",
+                    color: "#94a3b8",
+                    fontSize: "14px",
+                  }}
+                >
                   초기화하면 기존 비밀번호로 로그인할 수 없습니다.
                 </p>
                 {resetError && (
-                  <div className="alert alert-error" style={{ marginBottom: "16px" }}>
+                  <div
+                    className="alert alert-error"
+                    style={{ marginBottom: "16px" }}
+                  >
                     {resetError}
                   </div>
                 )}
-                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    justifyContent: "flex-end",
+                  }}
+                >
                   <Button variant="secondary" onClick={closeResetModal}>
                     취소
                   </Button>
@@ -248,7 +278,13 @@ export default function StoreList() {
                 <h3 style={{ margin: "0 0 16px", fontSize: "18px" }}>
                   비밀번호 초기화 완료
                 </h3>
-                <p style={{ margin: "0 0 12px", color: "#334155", lineHeight: 1.6 }}>
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    color: "#334155",
+                    lineHeight: 1.6,
+                  }}
+                >
                   새 임시 비밀번호를 점포에 전달해 주세요.
                 </p>
                 <div
@@ -288,7 +324,10 @@ export default function StoreList() {
                   </button>
                 </div>
                 {copyError && (
-                  <div className="alert alert-error" style={{ marginBottom: "20px" }}>
+                  <div
+                    className="alert alert-error"
+                    style={{ marginBottom: "20px" }}
+                  >
                     {copyError}
                   </div>
                 )}

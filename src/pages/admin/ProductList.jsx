@@ -8,16 +8,18 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { Badge, Card, EmptyState, Loading, StatCard } from "../../components/ui";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  Loading,
+  StatCard,
+} from "../../components/ui";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
 import { getProducts } from "../../services/productService";
 
-
-
 export default function ProductList() {
-
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -26,20 +28,26 @@ export default function ProductList() {
   const [pageSize, setPageSize] = useState(10);
 
   const [products, setProducts] = useState([]);
- const loadProducts = () => {
-  setLoading(true);
-  setError("");
-  getProducts()
-    .then((data) => setProducts(Array.isArray(data) ? data : []))
-    .catch((err) => setError(getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다.")))
-    .finally(() => setLoading(false));
-};
+  const loadProducts = () => {
+    setLoading(true);
+    setError("");
+    getProducts()
+      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .catch((err) =>
+        setError(
+          getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."),
+        ),
+      )
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     getProducts()
       .then((data) => setProducts(Array.isArray(data) ? data : []))
       .catch((err) =>
-        setError(getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."))
+        setError(
+          getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."),
+        ),
       )
       .finally(() => setLoading(false));
   }, []);
@@ -152,7 +160,9 @@ export default function ProductList() {
       </div>
 
       <div className="toolbar">
-        <div style={{ display: "flex", gap: "10px", flex: 1, flexWrap: "wrap" }}>
+        <div
+          style={{ display: "flex", gap: "10px", flex: 1, flexWrap: "wrap" }}
+        >
           <div className="search-box">
             <Search size={18} />
             <input
@@ -229,7 +239,10 @@ export default function ProductList() {
                         <strong>{product.product_name}</strong>
                       </td>
                       <td>
-                        <span className="badge" style={{ background: "#f1f5f9", color: "#334155" }}>
+                        <span
+                          className="badge"
+                          style={{ background: "#f1f5f9", color: "#334155" }}
+                        >
                           {product.category}
                         </span>
                       </td>
@@ -242,7 +255,9 @@ export default function ProductList() {
                       </td>
                       <td className="muted">
                         {product.created_at
-                          ? new Date(product.created_at).toLocaleDateString("ko-KR")
+                          ? new Date(product.created_at).toLocaleDateString(
+                              "ko-KR",
+                            )
                           : "-"}
                       </td>
                     </tr>
@@ -260,12 +275,20 @@ export default function ProductList() {
                   </strong>
                   개 표시
                 </span>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
                   <span>페이지당</span>
                   <select
                     className="pagination-size-select"
                     value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    onChange={(e) =>
+                      handlePageSizeChange(Number(e.target.value))
+                    }
                   >
                     <option value={10}>10개</option>
                     <option value={20}>20개</option>
@@ -312,13 +335,15 @@ export default function ProductList() {
                     >
                       {num}
                     </button>
-                  )
+                  ),
                 )}
 
                 <button
                   type="button"
                   className="page-btn"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                   disabled={currentPage >= totalPages}
                   title="다음 페이지"
                   aria-label="다음 페이지"

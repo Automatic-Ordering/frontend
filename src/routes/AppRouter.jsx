@@ -37,7 +37,10 @@ export default function AppRouter() {
           <Route path="/store/sales" element={<StoreSales />} />
           <Route path="/store/sales/new" element={<StoreSaleCreate />} />
           <Route path="/store/orders" element={<StoreOrders />} />
-          <Route path="/store/orders/recommendations" element={<StoreOrderRecommendations />} />
+          <Route
+            path="/store/orders/recommendations"
+            element={<StoreOrderRecommendations />}
+          />
           <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>

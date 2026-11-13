@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Boxes, Receipt } from "lucide-react";
-import { Button, Card, EmptyState, Input, Loading, StatCard } from "../../components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Loading,
+  StatCard,
+} from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
@@ -21,7 +28,12 @@ export default function StoreSales() {
   const loadSales = ({ targetPage = 1, from = fromDate, to = toDate } = {}) => {
     setLoading(true);
     setError("");
-    getSales({ from: from || undefined, to: to || undefined, page: targetPage, limit: PAGE_SIZE })
+    getSales({
+      from: from || undefined,
+      to: to || undefined,
+      page: targetPage,
+      limit: PAGE_SIZE,
+    })
       .then((data) => {
         setSales(data.items || []);
         setTotalCount(Number(data.total ?? 0));
@@ -29,7 +41,9 @@ export default function StoreSales() {
         setPage(Number(data.page ?? targetPage));
       })
       .catch((err) =>
-        setError(getApiError(err, "판매 내역을 불러오는 중 오류가 발생했습니다.")),
+        setError(
+          getApiError(err, "판매 내역을 불러오는 중 오류가 발생했습니다."),
+        ),
       )
       .finally(() => setLoading(false));
   };
@@ -67,7 +81,12 @@ export default function StoreSales() {
       <Header title="판매 내역" description="기간별 판매 내역을 조회합니다." />
 
       <div className="stats-grid">
-        <StatCard label="판매 건수" value={totalCount.toLocaleString()} icon={Receipt} tone="blue" />
+        <StatCard
+          label="판매 건수"
+          value={totalCount.toLocaleString()}
+          icon={Receipt}
+          tone="blue"
+        />
         <StatCard
           label="총 판매 수량 (현재 페이지)"
           value={pageQuantity.toLocaleString()}
@@ -93,7 +112,12 @@ export default function StoreSales() {
           <Button type="button" onClick={handleSearch} loading={loading}>
             조회
           </Button>
-          <Button type="button" variant="secondary" onClick={handleReset} disabled={loading}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleReset}
+            disabled={loading}
+          >
             초기화
           </Button>
         </div>
@@ -106,7 +130,13 @@ export default function StoreSales() {
           <div style={{ padding: "24px" }}>
             <div className="alert alert-error">{error}</div>
             <div style={{ marginTop: "12px", textAlign: "center" }}>
-              <button type="button" className="btn btn-primary" onClick={handleRetry}>다시 시도</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleRetry}
+              >
+                다시 시도
+              </button>
             </div>
           </div>
         ) : sales.length ? (
@@ -123,16 +153,23 @@ export default function StoreSales() {
               <tbody>
                 {sales.map((sale) => (
                   <tr key={sale.sales_id}>
-                    <td><strong>{sale.product_name ?? "-"}</strong></td>
                     <td>
-                      <span className="badge" style={{ background: "#f1f5f9", color: "#334155" }}>
+                      <strong>{sale.product_name ?? "-"}</strong>
+                    </td>
+                    <td>
+                      <span
+                        className="badge"
+                        style={{ background: "#f1f5f9", color: "#334155" }}
+                      >
                         {sale.category ?? "-"}
                       </span>
                     </td>
                     <td style={{ textAlign: "right", fontWeight: 600 }}>
                       {Number(sale.sales_quantity).toLocaleString()}
                     </td>
-                    <td className="muted">{new Date(sale.sales_date).toLocaleString("ko-KR")}</td>
+                    <td className="muted">
+                      {new Date(sale.sales_date).toLocaleString("ko-KR")}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -140,11 +177,19 @@ export default function StoreSales() {
           </div>
         ) : (
           <EmptyState>
-            {fromDate || toDate ? "해당 기간의 판매 내역이 없습니다." : "등록된 판매 내역이 없습니다."}
+            {fromDate || toDate
+              ? "해당 기간의 판매 내역이 없습니다."
+              : "등록된 판매 내역이 없습니다."}
           </EmptyState>
         )}
         {!loading && !error && sales.length > 0 && (
-          <Pagination page={page} totalPages={totalPages} total={totalCount} onChange={handlePageChange} disabled={loading} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={totalCount}
+            onChange={handlePageChange}
+            disabled={loading}
+          />
         )}
       </Card>
     </>

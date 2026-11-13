@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Button, Card, Input } from "../../components/ui";
 import { Header } from "../../components/layout";
@@ -24,9 +23,7 @@ export default function StoreSettings() {
   useEffect(() => {
     refreshUser()
       .catch((err) => {
-        setError(
-          getApiError(err, "점포 정보를 불러오지 못했습니다.")
-        );
+        setError(getApiError(err, "점포 정보를 불러오지 못했습니다."));
       })
       .finally(() => {
         setStoreLoading(false);
@@ -71,9 +68,7 @@ export default function StoreSettings() {
         confirmPassword: "",
       });
     } catch (err) {
-      setError(
-        getApiError(err, "비밀번호 변경에 실패했습니다.")
-      );
+      setError(getApiError(err, "비밀번호 변경에 실패했습니다."));
     } finally {
       setLoading(false);
     }
@@ -155,17 +150,9 @@ export default function StoreSettings() {
               required
             />
 
-            {error && (
-              <div className="alert alert-error">
-                {error}
-              </div>
-            )}
+            {error && <div className="alert alert-error">{error}</div>}
 
-            {message && (
-              <div className="alert alert-success">
-                {message}
-              </div>
-            )}
+            {message && <div className="alert alert-success">{message}</div>}
 
             <Button type="submit" loading={loading}>
               비밀번호 변경

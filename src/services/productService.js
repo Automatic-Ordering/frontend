@@ -40,5 +40,3 @@ export const getStoreProductsPage = async ({ page, limit, search } = {}) => {
   if (search) params.search = search;
   return unwrap(await api.get("/store/products", { params }));
 };
-
-

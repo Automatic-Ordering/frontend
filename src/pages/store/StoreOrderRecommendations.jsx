@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, RefreshCw, ShoppingCart } from "lucide-react";
-import { Button, Card, EmptyState, Loading, SearchInput, StatCard } from "../../components/ui";
+import {
+  AlertTriangle,
+  ClipboardList,
+  RefreshCw,
+  ShoppingCart,
+} from "lucide-react";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Loading,
+  SearchInput,
+  StatCard,
+} from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
@@ -28,10 +40,17 @@ export default function StoreOrderRecommendations() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  const loadRecommendations = ({ targetPage = 1, search = query.trim() } = {}) => {
+  const loadRecommendations = ({
+    targetPage = 1,
+    search = query.trim(),
+  } = {}) => {
     setLoading(true);
     setError("");
-    getRecommendations({ page: targetPage, limit: PAGE_SIZE, search: search || undefined })
+    getRecommendations({
+      page: targetPage,
+      limit: PAGE_SIZE,
+      search: search || undefined,
+    })
       .then((data) => {
         const items = data.items || [];
         setRecommendations(items);
@@ -48,7 +67,9 @@ export default function StoreOrderRecommendations() {
         setPage(Number(data.page ?? targetPage));
       })
       .catch((err) =>
-        setError(getApiError(err, "발주 추천 목록을 불러오는 중 오류가 발생했습니다.")),
+        setError(
+          getApiError(err, "발주 추천 목록을 불러오는 중 오류가 발생했습니다."),
+        ),
       )
       .finally(() => setLoading(false));
   };
@@ -66,14 +87,20 @@ export default function StoreOrderRecommendations() {
   const pendingItems = useMemo(
     () =>
       Object.entries(quantities)
-        .map(([productId, value]) => ({ product_id: Number(productId), quantity: Number(value || 0) }))
+        .map(([productId, value]) => ({
+          product_id: Number(productId),
+          quantity: Number(value || 0),
+        }))
         .filter((item) => item.quantity > 0),
     [quantities],
   );
 
   const totalRecommendedQuantity = useMemo(
     () =>
-      recommendations.reduce((sum, item) => sum + Number(item.order_quantity || 0), 0),
+      recommendations.reduce(
+        (sum, item) => sum + Number(item.order_quantity || 0),
+        0,
+      ),
     [recommendations],
   );
 
@@ -99,8 +126,15 @@ export default function StoreOrderRecommendations() {
       return;
     }
 
-    const totalQuantity = pendingItems.reduce((sum, item) => sum + item.quantity, 0);
-    if (!window.confirm(`총 ${pendingItems.length}개 상품 / ${totalQuantity.toLocaleString()}개 수량을 발주 확정하시겠습니까?`)) {
+    const totalQuantity = pendingItems.reduce(
+      (sum, item) => sum + item.quantity,
+      0,
+    );
+    if (
+      !window.confirm(
+        `총 ${pendingItems.length}개 상품 / ${totalQuantity.toLocaleString()}개 수량을 발주 확정하시겠습니까?`,
+      )
+    ) {
       return;
     }
 
@@ -108,14 +142,20 @@ export default function StoreOrderRecommendations() {
     try {
       const created = await confirmOrders(pendingItems);
       const confirmedIds = new Set(
-        (Array.isArray(created) ? created : []).map((order) => Number(order.product_id)),
+        (Array.isArray(created) ? created : []).map((order) =>
+          Number(order.product_id),
+        ),
       );
       setQuantities((prev) =>
         Object.fromEntries(
-          Object.entries(prev).filter(([productId]) => !confirmedIds.has(Number(productId))),
+          Object.entries(prev).filter(
+            ([productId]) => !confirmedIds.has(Number(productId)),
+          ),
         ),
       );
-      setSuccess(`${created.length}건의 발주가 등록되었습니다. (발주 대기 상태)`);
+      setSuccess(
+        `${created.length}건의 발주가 등록되었습니다. (발주 대기 상태)`,
+      );
       loadRecommendations({ targetPage: page });
     } catch (err) {
       setFormError(getApiError(err, "발주 확정 중 오류가 발생했습니다."));
@@ -132,7 +172,12 @@ export default function StoreOrderRecommendations() {
       />
 
       <div className="stats-grid">
-        <StatCard label="상품 수" value={totalCount.toLocaleString()} icon={ClipboardList} tone="blue" />
+        <StatCard
+          label="상품 수"
+          value={totalCount.toLocaleString()}
+          icon={ClipboardList}
+          tone="blue"
+        />
         <StatCard
           label={`발주 필요 상품 (현재 페이지)`}
           value={recommendations.filter((item) => item.needs_order).length}
@@ -147,7 +192,11 @@ export default function StoreOrderRecommendations() {
         />
       </div>
 
-      {success && <div className="alert alert-success" style={{ marginBottom: "16px" }}>{success}</div>}
+      {success && (
+        <div className="alert alert-success" style={{ marginBottom: "16px" }}>
+          {success}
+        </div>
+      )}
 
       <div className="toolbar">
         <div className="toolbar-left">
@@ -157,13 +206,22 @@ export default function StoreOrderRecommendations() {
             onChange={(event) => setQuery(event.target.value)}
             onSearch={handleSearch}
           />
-          <Button type="button" variant="secondary" className="btn-sm" onClick={handleSearch} disabled={loading || submitting}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="btn-sm"
+            onClick={handleSearch}
+            disabled={loading || submitting}
+          >
             조회
           </Button>
         </div>
         <div className="toolbar-right">
           {pendingItems.length > 0 && (
-            <span className="muted" style={{ fontSize: "12px", fontWeight: 600 }}>
+            <span
+              className="muted"
+              style={{ fontSize: "12px", fontWeight: 600 }}
+            >
               {pendingItems.length}개 상품 선택
             </span>
           )}
@@ -190,7 +248,9 @@ export default function StoreOrderRecommendations() {
       </div>
 
       {formError && (
-        <div className="alert alert-error" style={{ marginBottom: "16px" }}>{formError}</div>
+        <div className="alert alert-error" style={{ marginBottom: "16px" }}>
+          {formError}
+        </div>
       )}
 
       <Card className="table-card">
@@ -200,7 +260,13 @@ export default function StoreOrderRecommendations() {
           <div style={{ padding: "24px" }}>
             <div className="alert alert-error">{error}</div>
             <div style={{ marginTop: "12px", textAlign: "center" }}>
-              <button type="button" className="btn btn-primary" onClick={() => loadRecommendations({ targetPage: page })}>다시 시도</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => loadRecommendations({ targetPage: page })}
+              >
+                다시 시도
+              </button>
             </div>
           </div>
         ) : recommendations.length ? (
@@ -225,35 +291,70 @@ export default function StoreOrderRecommendations() {
                   const hasWarning = item.data_warning.length > 0;
                   return (
                     <tr key={item.product_id}>
-                      <td className="muted" style={{ fontFamily: "monospace" }}>#{item.product_id}</td>
-                      <td><strong>{item.product_name}</strong></td>
+                      <td className="muted" style={{ fontFamily: "monospace" }}>
+                        #{item.product_id}
+                      </td>
                       <td>
-                        <span className="badge" style={{ background: "#f1f5f9", color: "#334155" }}>
+                        <strong>{item.product_name}</strong>
+                      </td>
+                      <td>
+                        <span
+                          className="badge"
+                          style={{ background: "#f1f5f9", color: "#334155" }}
+                        >
                           {item.category || "-"}
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>{Number(item.current_stock).toLocaleString()}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {Number(item.current_stock).toLocaleString()}
+                      </td>
                       <td style={{ textAlign: "right", fontWeight: 600 }}>
                         {Number(item.predicted_demand).toFixed(2)}
                       </td>
                       <td style={{ textAlign: "right" }}>
                         {Number(item.applied_safety_stock).toLocaleString()}
                         {item.safety_stock_source === "CONFIGURED" && (
-                          <small className="muted" style={{ display: "block" }}>(설정값)</small>
+                          <small className="muted" style={{ display: "block" }}>
+                            (설정값)
+                          </small>
                         )}
                       </td>
-                      <td style={{ textAlign: "right" }}>{Number(item.target_stock).toLocaleString()}</td>
-                      <td style={{ textAlign: "right", fontWeight: 600, color: item.needs_order ? "#b45309" : "#64748b" }}>
-                        {item.needs_order ? Number(item.order_quantity).toLocaleString() : "발주 불필요"}
+                      <td style={{ textAlign: "right" }}>
+                        {Number(item.target_stock).toLocaleString()}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontWeight: 600,
+                          color: item.needs_order ? "#b45309" : "#64748b",
+                        }}
+                      >
+                        {item.needs_order
+                          ? Number(item.order_quantity).toLocaleString()
+                          : "발주 불필요"}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <input
                           type="text"
                           inputMode="numeric"
-                          value={quantities[item.product_id] ?? String(item.order_quantity)}
-                          onChange={(event) => handleQuantityChange(item.product_id, event.target.value)}
+                          value={
+                            quantities[item.product_id] ??
+                            String(item.order_quantity)
+                          }
+                          onChange={(event) =>
+                            handleQuantityChange(
+                              item.product_id,
+                              event.target.value,
+                            )
+                          }
                           disabled={submitting}
-                          style={{ width: "76px", textAlign: "right", padding: "7px 9px", border: "1px solid #e2e8f0", borderRadius: "8px" }}
+                          style={{
+                            width: "76px",
+                            textAlign: "right",
+                            padding: "7px 9px",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                          }}
                         />
                       </td>
                       <td style={{ textAlign: "center" }}>
@@ -261,7 +362,9 @@ export default function StoreOrderRecommendations() {
                           <span
                             className="badge"
                             style={{ background: "#fef3c7", color: "#b45309" }}
-                            title={item.data_warning.map((code) => WARNING_LABELS[code] || code).join(", ")}
+                            title={item.data_warning
+                              .map((code) => WARNING_LABELS[code] || code)
+                              .join(", ")}
                           >
                             <AlertTriangle size={12} /> 데이터 부족
                           </span>
@@ -277,7 +380,9 @@ export default function StoreOrderRecommendations() {
           </div>
         ) : (
           <EmptyState>
-            {query.trim() ? "검색 결과가 없습니다." : "발주 추천을 계산할 재고 상품이 없습니다."}
+            {query.trim()
+              ? "검색 결과가 없습니다."
+              : "발주 추천을 계산할 재고 상품이 없습니다."}
           </EmptyState>
         )}
       </Card>

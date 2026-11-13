@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, RefreshCw, ShoppingCart } from "lucide-react";
-import { Button, Card, EmptyState, Loading, StatCard } from "../../components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Loading,
+  StatCard,
+} from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
@@ -27,7 +33,8 @@ const STATUS_LABELS = Object.fromEntries(
 
 const PAGE_SIZE = 20;
 
-const formatDateTime = (value) => (value ? new Date(value).toLocaleString("ko-KR") : "-");
+const formatDateTime = (value) =>
+  value ? new Date(value).toLocaleString("ko-KR") : "-";
 
 export default function StoreOrders() {
   const [orders, setOrders] = useState([]);
@@ -44,7 +51,11 @@ export default function StoreOrders() {
   const loadOrders = ({ status = statusFilter, targetPage = 1 } = {}) => {
     setLoading(true);
     setError("");
-    getOrders({ status: status || undefined, page: targetPage, limit: PAGE_SIZE })
+    getOrders({
+      status: status || undefined,
+      page: targetPage,
+      limit: PAGE_SIZE,
+    })
       .then((data) => {
         setOrders(data.items || []);
         setTotalCount(Number(data.total ?? 0));
@@ -52,7 +63,9 @@ export default function StoreOrders() {
         setPage(Number(data.page ?? targetPage));
       })
       .catch((err) =>
-        setError(getApiError(err, "발주 이력을 불러오는 중 오류가 발생했습니다.")),
+        setError(
+          getApiError(err, "발주 이력을 불러오는 중 오류가 발생했습니다."),
+        ),
       )
       .finally(() => setLoading(false));
   };
@@ -79,7 +92,9 @@ export default function StoreOrders() {
       const data = await getOrder(orderId);
       setDetail(data);
     } catch (err) {
-      setDetail({ error: getApiError(err, "발주 상세를 불러오지 못했습니다.") });
+      setDetail({
+        error: getApiError(err, "발주 상세를 불러오지 못했습니다."),
+      });
     } finally {
       setDetailLoading(false);
     }
@@ -106,11 +121,24 @@ export default function StoreOrders() {
 
   return (
     <>
-      <Header title="발주 이력" description="확정한 발주의 처리 상태를 조회합니다." />
+      <Header
+        title="발주 이력"
+        description="확정한 발주의 처리 상태를 조회합니다."
+      />
 
       <div className="stats-grid">
-        <StatCard label="총 발주 수" value={totalCount.toLocaleString()} icon={ClipboardList} tone="blue" />
-        <StatCard label="발주 대기 (현재 페이지)" value={pendingCount} icon={ShoppingCart} tone="orange" />
+        <StatCard
+          label="총 발주 수"
+          value={totalCount.toLocaleString()}
+          icon={ClipboardList}
+          tone="blue"
+        />
+        <StatCard
+          label="발주 대기 (현재 페이지)"
+          value={pendingCount}
+          icon={ShoppingCart}
+          tone="orange"
+        />
       </div>
 
       <div className="toolbar">
@@ -122,15 +150,29 @@ export default function StoreOrders() {
               onChange={(event) => setStatusFilter(event.target.value)}
             >
               {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
             </select>
           </label>
-          <Button type="button" onClick={handleSearch} loading={loading}>조회</Button>
-          <Button type="button" variant="secondary" onClick={handleReset} disabled={loading}>
+          <Button type="button" onClick={handleSearch} loading={loading}>
+            조회
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleReset}
+            disabled={loading}
+          >
             초기화
           </Button>
-          <Button type="button" variant="secondary" onClick={() => loadOrders()} disabled={loading}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => loadOrders()}
+            disabled={loading}
+          >
             <RefreshCw size={16} className={loading ? "spin" : ""} />
             새로고침
           </Button>
@@ -144,7 +186,13 @@ export default function StoreOrders() {
           <div style={{ padding: "24px" }}>
             <div className="alert alert-error">{error}</div>
             <div style={{ marginTop: "12px", textAlign: "center" }}>
-              <button type="button" className="btn btn-primary" onClick={handleSearch}>다시 시도</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSearch}
+              >
+                다시 시도
+              </button>
             </div>
           </div>
         ) : orders.length ? (
@@ -169,7 +217,9 @@ export default function StoreOrders() {
                     order={order}
                     expanded={expandedOrderId === order.order_id}
                     detail={expandedOrderId === order.order_id ? detail : null}
-                    detailLoading={expandedOrderId === order.order_id ? detailLoading : false}
+                    detailLoading={
+                      expandedOrderId === order.order_id ? detailLoading : false
+                    }
                     onToggle={handleToggleDetail}
                   />
                 ))}
@@ -184,7 +234,13 @@ export default function StoreOrders() {
           </EmptyState>
         )}
         {!loading && !error && orders.length > 0 && (
-          <Pagination page={page} totalPages={totalPages} total={totalCount} onChange={handlePageChange} disabled={loading} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={totalCount}
+            onChange={handlePageChange}
+            disabled={loading}
+          />
         )}
       </Card>
     </>
@@ -195,10 +251,17 @@ function OrderRow({ order, expanded, detail, detailLoading, onToggle }) {
   return (
     <>
       <tr key={order.order_id}>
-        <td className="muted" style={{ fontFamily: "monospace" }}>#{order.order_id}</td>
-        <td><strong>{order.product_name ?? "-"}</strong></td>
+        <td className="muted" style={{ fontFamily: "monospace" }}>
+          #{order.order_id}
+        </td>
         <td>
-          <span className="badge" style={{ background: "#f1f5f9", color: "#334155" }}>
+          <strong>{order.product_name ?? "-"}</strong>
+        </td>
+        <td>
+          <span
+            className="badge"
+            style={{ background: "#f1f5f9", color: "#334155" }}
+          >
             {order.category ?? "-"}
           </span>
         </td>
@@ -206,7 +269,10 @@ function OrderRow({ order, expanded, detail, detailLoading, onToggle }) {
           {Number(order.order_quantity).toLocaleString()}
         </td>
         <td style={{ textAlign: "center" }}>
-          <span className="badge" style={STATUS_BADGE_STYLES[order.order_status] || {}}>
+          <span
+            className="badge"
+            style={STATUS_BADGE_STYLES[order.order_status] || {}}
+          >
             {STATUS_LABELS[order.order_status] || order.order_status}
           </span>
         </td>
@@ -230,18 +296,41 @@ function OrderRow({ order, expanded, detail, detailLoading, onToggle }) {
             ) : detail?.error ? (
               <div className="alert alert-error">{detail.error}</div>
             ) : detail ? (
-              <div style={{ padding: "8px 4px", display: "grid", gap: "6px", fontSize: "13px" }}>
-                <div><strong>발주 번호</strong>: #{detail.order_id}</div>
-                <div><strong>상품</strong>: {detail.product_name ?? "-"} ({detail.category ?? "-"})</div>
-                <div><strong>발주 수량</strong>: {Number(detail.order_quantity).toLocaleString()}개</div>
+              <div
+                style={{
+                  padding: "8px 4px",
+                  display: "grid",
+                  gap: "6px",
+                  fontSize: "13px",
+                }}
+              >
+                <div>
+                  <strong>발주 번호</strong>: #{detail.order_id}
+                </div>
+                <div>
+                  <strong>상품</strong>: {detail.product_name ?? "-"} (
+                  {detail.category ?? "-"})
+                </div>
+                <div>
+                  <strong>발주 수량</strong>:{" "}
+                  {Number(detail.order_quantity).toLocaleString()}개
+                </div>
                 <div>
                   <strong>발주 상태</strong>:{" "}
-                  <span className="badge" style={STATUS_BADGE_STYLES[detail.order_status] || {}}>
+                  <span
+                    className="badge"
+                    style={STATUS_BADGE_STYLES[detail.order_status] || {}}
+                  >
                     {STATUS_LABELS[detail.order_status] || detail.order_status}
                   </span>
                 </div>
-                <div><strong>발주일시</strong>: {formatDateTime(detail.created_at)}</div>
-                <div><strong>상태 변경일시</strong>: {formatDateTime(detail.updated_at)}</div>
+                <div>
+                  <strong>발주일시</strong>: {formatDateTime(detail.created_at)}
+                </div>
+                <div>
+                  <strong>상태 변경일시</strong>:{" "}
+                  {formatDateTime(detail.updated_at)}
+                </div>
               </div>
             ) : null}
           </td>

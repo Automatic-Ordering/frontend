@@ -3,7 +3,9 @@ const buildPageList = (page, totalPages) => {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
   const candidates = new Set(
-    [1, totalPages, page - 1, page, page + 1].filter((value) => value >= 1 && value <= totalPages),
+    [1, totalPages, page - 1, page, page + 1].filter(
+      (value) => value >= 1 && value <= totalPages,
+    ),
   );
   const sorted = [...candidates].sort((a, b) => a - b);
   const result = [];
@@ -16,7 +18,13 @@ const buildPageList = (page, totalPages) => {
   return result;
 };
 
-export default function Pagination({ page, totalPages, onChange, disabled = false, total }) {
+export default function Pagination({
+  page,
+  totalPages,
+  onChange,
+  disabled = false,
+  total,
+}) {
   if (!totalPages) return null;
 
   return (
@@ -40,7 +48,9 @@ export default function Pagination({ page, totalPages, onChange, disabled = fals
         </button>
         {buildPageList(page, totalPages).map((value, index) =>
           value === "..." ? (
-            <span key={`ellipsis-${index}`} className="page-ellipsis">…</span>
+            <span key={`ellipsis-${index}`} className="page-ellipsis">
+              …
+            </span>
           ) : (
             <button
               key={value}

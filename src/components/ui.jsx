@@ -18,7 +18,12 @@ export function Button({
     </button>
   );
 }
-export function SearchInput({ placeholder = "검색", value, onChange, onSearch }) {
+export function SearchInput({
+  placeholder = "검색",
+  value,
+  onChange,
+  onSearch,
+}) {
   return (
     <div className="search-box compact">
       <Search size={18} />
