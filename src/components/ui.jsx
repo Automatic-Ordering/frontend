@@ -1,20 +1,36 @@
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Search } from "lucide-react";
 export function Button({
   children,
   variant = "primary",
   loading = false,
   className = "",
+  disabled,
   ...props
 }) {
   return (
     <button
       className={`btn btn-${variant} ${className}`}
-      disabled={loading || props.disabled}
+      disabled={loading || disabled}
       {...props}
     >
       {loading && <LoaderCircle size={16} className="spin" />}
       {children}
     </button>
+  );
+}
+export function SearchInput({ placeholder = "검색", value, onChange, onSearch }) {
+  return (
+    <div className="search-box compact">
+      <Search size={18} />
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && onSearch) onSearch();
+        }}
+      />
+    </div>
   );
 }
 export function Input({ label, error, ...props }) {

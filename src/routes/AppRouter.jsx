@@ -9,6 +9,10 @@ import StoreDetail from "../pages/admin/StoreDetail";
 import ProductList from "../pages/admin/ProductList";
 import StoreDashboard from "../pages/store/StoreDashboard";
 import StoreInventory from "../pages/store/StoreInventory";
+import StoreSales from "../pages/store/StoreSales";
+import StoreSaleCreate from "../pages/store/StoreSaleCreate";
+import StoreOrderRecommendations from "../pages/store/StoreOrderRecommendations";
+import StoreOrders from "../pages/store/StoreOrders";
 import StoreSettings from "../pages/store/StoreSettings";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminRoute from "./AdminRoute";
@@ -30,6 +34,10 @@ export default function AppRouter() {
         <Route element={<StoreLayout />}>
           <Route path="/store" element={<StoreDashboard />} />
           <Route path="/store/inventory" element={<StoreInventory />} />
+          <Route path="/store/sales" element={<StoreSales />} />
+          <Route path="/store/sales/new" element={<StoreSaleCreate />} />
+          <Route path="/store/orders" element={<StoreOrders />} />
+          <Route path="/store/orders/recommendations" element={<StoreOrderRecommendations />} />
           <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>
