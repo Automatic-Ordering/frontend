@@ -24,14 +24,6 @@ export const getRecommendationDetail = async (productId) => {
 };
 
 /**
- * 발주 확정
- * POST /api/store/orders/confirm  body: { items: [{ product_id, quantity }] }
- */
-export const confirmOrders = async (items) => {
-  return unwrap(await api.post("/store/orders/confirm", { items }));
-};
-
-/**
  * 발주 이력 조회 (페이지네이션)
  * GET /api/store/orders?status=PENDING&page=1&limit=20
  * 응답: { items, total, page, limit, total_pages }

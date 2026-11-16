@@ -3,6 +3,7 @@ import { Button, EmptyState, Loading } from "./ui";
 
 export const SPEC_STATUSES = [
   "DRAFT",
+  "PENDING_RECEIPT",
   "REQUESTED",
   "APPROVED",
   "REJECTED",
@@ -13,6 +14,7 @@ export const SPEC_STATUSES = [
 
 export const SPEC_STATUS_LABELS = {
   DRAFT: "임시 저장",
+  PENDING_RECEIPT: "입고 대기",
   REQUESTED: "승인 대기",
   APPROVED: "승인 완료",
   REJECTED: "반려",
@@ -23,6 +25,7 @@ export const SPEC_STATUS_LABELS = {
 
 export const SPEC_STATUS_BADGE_STYLES = {
   DRAFT: { background: "#f1f5f9", color: "#475569" },
+  PENDING_RECEIPT: { background: "#fef3c7", color: "#b45309" },
   REQUESTED: { background: "#fef3c7", color: "#b45309" },
   APPROVED: { background: "#dbeafe", color: "#1d4ed8" },
   REJECTED: { background: "#fee2e2", color: "#b91c1c" },

@@ -70,7 +70,7 @@ export default function StoreReceipts() {
         Object.fromEntries(
           (data.items ?? []).map((item) => [
             item.product_id,
-            String(item.order_quantity),
+            "",
           ]),
         ),
       );
@@ -107,17 +107,25 @@ export default function StoreReceipts() {
 
   const handleReceive = async () => {
     setActionError("");
-    const items = (detail?.items ?? []).map((item) => ({
+    const rawItems = (detail?.items ?? []).map((item) => ({
       product_id: item.product_id,
-      received_quantity: Number(received[item.product_id] ?? ""),
+      value: received[item.product_id] ?? "",
     }));
-    const invalid = items.find(
-      (item) => !Number.isInteger(item.received_quantity) || item.received_quantity < 0,
-    );
-    if (invalid) {
+    if (
+      rawItems.some(
+        (item) =>
+          item.value === "" ||
+          !Number.isInteger(Number(item.value)) ||
+          Number(item.value) < 0,
+      )
+    ) {
       setActionError("입고 수량은 0 이상의 정수로 모든 상품에 입력해야 합니다.");
       return;
     }
+    const items = rawItems.map((item) => ({
+      product_id: item.product_id,
+      received_quantity: Number(item.value),
+    }));
     const totalReceived = items.reduce(
       (sum, item) => sum + item.received_quantity,
       0,
@@ -161,7 +169,7 @@ export default function StoreReceipts() {
       <div className="toolbar">
         <div className="toolbar-left">
           <span className="muted" style={{ fontSize: "13px" }}>
-            발주서 발행이 완료된(ORDERED) 발주만 표시됩니다.
+            점주가 확정한(PENDING_RECEIPT) 발주만 표시됩니다.
           </span>
         </div>
         <div className="toolbar-right">
@@ -197,7 +205,7 @@ export default function StoreReceipts() {
                   <th style={{ textAlign: "right" }}>상품 수</th>
                   <th style={{ textAlign: "right" }}>총 발주 금액</th>
                   <th style={{ textAlign: "center" }}>상태</th>
-                  <th>발행 일시</th>
+                  <th>발주 확정 일시</th>
                   <th style={{ textAlign: "center" }}>관리</th>
                 </tr>
               </thead>
@@ -220,8 +228,8 @@ export default function StoreReceipts() {
                       <SpecStatusBadge status={spec.order_status} />
                     </td>
                     <td className="muted">
-                      {spec.issued_at
-                        ? new Date(spec.issued_at).toLocaleString("ko-KR")
+                      {spec.confirmed_at
+                        ? new Date(spec.confirmed_at).toLocaleString("ko-KR")
                         : "-"}
                     </td>
                     <td style={{ textAlign: "center" }}>
@@ -241,8 +249,7 @@ export default function StoreReceipts() {
           </div>
         ) : (
           <EmptyState>
-            입고 대기 중인 발주가 없습니다. 본사에서 발주서가 발행되면 이
-            화면에 표시됩니다.
+            입고 대기 중인 발주가 없습니다. 발주를 확정하면 이 화면에 표시됩니다.
           </EmptyState>
         )}
         {!loading && specs.length > 0 && (

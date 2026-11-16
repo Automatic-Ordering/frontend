@@ -3,8 +3,6 @@ import LoginPage from "../pages/auth/LoginPage";
 import AdminLayout from "../layouts/AdminLayout";
 import StoreLayout from "../layouts/StoreLayout";
 import AdminDashboard from "../pages/admin/AdminDashboard";
-import AdminOrderApprovals from "../pages/admin/AdminOrderApprovals";
-import AdminIssuedOrders from "../pages/admin/AdminIssuedOrders";
 import StoreList from "../pages/admin/StoreList";
 import StoreCreate from "../pages/admin/StoreCreate";
 import StoreDetail from "../pages/admin/StoreDetail";
@@ -20,6 +18,7 @@ import StoreReceipts from "../pages/store/StoreReceipts";
 import StoreOrderSettings from "../pages/store/StoreOrderSettings";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminRoute from "./AdminRoute";
+import StoreSettings from "../pages/store/StoreSettings";
 export default function AppRouter() {
   return (
     <Routes>
@@ -28,8 +27,6 @@ export default function AppRouter() {
       <Route element={<AdminRoute />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/orders" element={<AdminOrderApprovals />} />
-          <Route path="/admin/orders/issued" element={<AdminIssuedOrders />} />
           <Route path="/admin/stores" element={<StoreList />} />
           <Route path="/admin/stores/new" element={<StoreCreate />} />
           <Route path="/admin/stores/:storeId" element={<StoreDetail />} />
@@ -57,7 +54,7 @@ export default function AppRouter() {
             element={<Navigate to="/store/orders/specs" replace />}
           />
           <Route path="/store/order-settings" element={<StoreOrderSettings />} />
-          <Route path="/store/order-settings" element={<StoreOrderSettings />} />
+          <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

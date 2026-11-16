@@ -16,7 +16,7 @@ export const getOrderSpecs = async ({ status, page, limit } = {}) => {
 };
 
 /**
- * 입고 대기 발주 목록 조회 (점포, ORDERED 상태)
+ * 입고 대기 발주 목록 조회 (점포, PENDING_RECEIPT 상태)
  * GET /api/store/orders/specs/pending-receipts?page=&limit=
  */
 export const getPendingReceipts = async ({ page, limit } = {}) => {
@@ -53,11 +53,19 @@ export const updateOrderSpecItems = async (specId, items) => {
 };
 
 /**
- * 발주 명세서 제출 (DRAFT → REQUESTED)
+ * 레거시 발주 명세서 제출 (DRAFT → REQUESTED)
  * POST /api/store/orders/specs/:specId/submit
  */
 export const submitOrderSpec = async (specId) => {
   return unwrap(await api.post(`/store/orders/specs/${specId}/submit`));
+};
+
+/**
+ * 점주 발주 확정 (DRAFT → PENDING_RECEIPT)
+ * POST /api/store/orders/specs/:specId/confirm
+ */
+export const confirmOrderSpec = async (specId) => {
+  return unwrap(await api.post(`/store/orders/specs/${specId}/confirm`));
 };
 
 /**
@@ -69,7 +77,7 @@ export const cancelOrderSpec = async (specId) => {
 };
 
 /**
- * 입고 처리 (ORDERED → RECEIVED, 재고 증가)
+ * 입고 처리 (PENDING_RECEIPT → RECEIVED, 재고 증가)
  * POST /api/store/orders/specs/:specId/receipt
  * body: { items: [{ product_id, received_quantity }] }
  * 응답: 명세서 + comparison [{ product_id, product_name, order_quantity, received_quantity, difference }]
@@ -97,28 +105,4 @@ export const getAdminOrderSpecs = async ({ storeId, status, page, limit } = {}) 
  */
 export const getAdminOrderSpecDetail = async (specId) => {
   return unwrap(await api.get(`/admin/orders/specs/${specId}`));
-};
-
-/**
- * 발주 승인 (REQUESTED → APPROVED)
- * POST /api/admin/orders/specs/:specId/approve
- */
-export const approveOrderSpec = async (specId) => {
-  return unwrap(await api.post(`/admin/orders/specs/${specId}/approve`));
-};
-
-/**
- * 발주 반려 (REQUESTED → REJECTED)
- * POST /api/admin/orders/specs/:specId/reject  body: { reason }
- */
-export const rejectOrderSpec = async (specId, reason) => {
-  return unwrap(await api.post(`/admin/orders/specs/${specId}/reject`, { reason }));
-};
-
-/**
- * 발주서 발행 (APPROVED → ORDERED)
- * POST /api/admin/orders/specs/:specId/issue
- */
-export const issueOrderSpec = async (specId) => {
-  return unwrap(await api.post(`/admin/orders/specs/${specId}/issue`));
 };

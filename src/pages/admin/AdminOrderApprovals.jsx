@@ -17,11 +17,8 @@ import {
 } from "../../components/orderSpec";
 import { getApiError } from "../../services/api";
 import {
-  approveOrderSpec,
   getAdminOrderSpecDetail,
   getAdminOrderSpecs,
-  issueOrderSpec,
-  rejectOrderSpec,
 } from "../../services/orderSpecService";
 import { getStores } from "../../services/storeService";
 
@@ -38,16 +35,10 @@ export default function AdminOrderApprovals() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [rowBusyId, setRowBusyId] = useState(null);
-
   const [detailId, setDetailId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const [actionLoading, setActionLoading] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [rejectMode, setRejectMode] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
 
   const loadStores = () => {
     getStores()
@@ -105,10 +96,6 @@ export default function AdminOrderApprovals() {
   const openDetail = async (specId) => {
     setDetailId(specId);
     setDetail(null);
-    setActionError("");
-    setRejectMode(false);
-    setRejectReason("");
-    setActionLoading("");
     await loadDetail(specId);
   };
 
@@ -116,10 +103,6 @@ export default function AdminOrderApprovals() {
     setDetailId(null);
     setDetail(null);
     setDetailError("");
-    setActionLoading("");
-    setActionError("");
-    setRejectMode(false);
-    setRejectReason("");
   };
 
   const requestedCount = useMemo(
@@ -127,90 +110,11 @@ export default function AdminOrderApprovals() {
     [specs],
   );
 
-  const refreshList = () => loadSpecs({ targetPage: page });
-
-  const handleApprove = async (specId) => {
-    const spec =
-      detail?.order_spec_id === specId
-        ? detail
-        : specs.find((item) => item.order_spec_id === specId);
-    if (
-      !window.confirm(
-        `발주를 승인하시겠습니까?\n발주 번호: ${spec?.order_number ?? specId}\n총 발주 금액: ${formatAmount(spec?.total_amount)}`,
-      )
-    ) {
-      return;
-    }
-    const isModalAction = detailId === specId;
-    setActionLoading(isModalAction ? "approve" : "");
-    setRowBusyId(isModalAction ? null : specId);
-    try {
-      await approveOrderSpec(specId);
-      if (isModalAction) await loadDetail(specId);
-      refreshList();
-    } catch (err) {
-      const message = getApiError(err, "발주 승인 중 오류가 발생했습니다.");
-      if (isModalAction) setActionError(message);
-      else setError(message);
-    } finally {
-      setActionLoading("");
-      setRowBusyId(null);
-    }
-  };
-
-  const handleIssue = async () => {
-    if (
-      !window.confirm(
-        `발주서를 발행하시겠습니까?\n발주 번호: ${detail?.order_number ?? detailId}`,
-      )
-    ) {
-      return;
-    }
-    setActionLoading("issue");
-    try {
-      await issueOrderSpec(detail.order_spec_id);
-      await loadDetail(detail.order_spec_id);
-      refreshList();
-    } catch (err) {
-      setActionError(getApiError(err, "발주서 발행 중 오류가 발생했습니다."));
-    } finally {
-      setActionLoading("");
-    }
-  };
-
-  const handleReject = async () => {
-    setActionError("");
-    const reason = rejectReason.trim();
-    if (!reason) {
-      setActionError("반려 사유를 입력하세요.");
-      return;
-    }
-    if (
-      !window.confirm(
-        `발주를 반려하시겠습니까?\n발주 번호: ${detail?.order_number ?? detailId}\n반려 사유: ${reason}`,
-      )
-    ) {
-      return;
-    }
-    setActionLoading("reject");
-    try {
-      await rejectOrderSpec(detail.order_spec_id, reason);
-      setRejectMode(false);
-      setRejectReason("");
-      await loadDetail(detail.order_spec_id);
-      refreshList();
-    } catch (err) {
-      setActionError(getApiError(err, "발주 반려 처리 중 오류가 발생했습니다."));
-    } finally {
-      setActionLoading("");
-    }
-  };
-
   return (
     <>
       <Header
-        title="발주 승인 관리"
-        description="점포에서 제출한 발주 명세서를 검토하고 승인 또는 반려할 수 있습니다."
+        title="발주 현황"
+        description="점포 발주 명세서의 현황을 조회하고 상세 내용을 확인합니다."
       />
 
       <div className="stats-grid">
@@ -356,20 +260,9 @@ export default function AdminOrderApprovals() {
                           type="button"
                           className="btn btn-secondary btn-sm"
                           onClick={() => openDetail(spec.order_spec_id)}
-                          disabled={rowBusyId === spec.order_spec_id}
                         >
                           상세
                         </button>
-                        {spec.order_status === "REQUESTED" && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleApprove(spec.order_spec_id)}
-                            disabled={rowBusyId === spec.order_spec_id}
-                          >
-                            {rowBusyId === spec.order_spec_id ? "처리 중..." : "승인"}
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -403,136 +296,6 @@ export default function AdminOrderApprovals() {
           error={detailError}
           onRetry={() => loadDetail(detailId)}
           onClose={closeDetail}
-          banner={
-            rejectMode ? (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  borderRadius: "10px",
-                  padding: "14px",
-                  marginBottom: "14px",
-                }}
-              >
-                <label className="field" style={{ marginBottom: "10px" }}>
-                  <span>반려 사유 (필수)</span>
-                  <textarea
-                    rows={3}
-                    value={rejectReason}
-                    onChange={(event) => setRejectReason(event.target.value)}
-                    placeholder="반려 사유를 입력하세요. (최대 500자)"
-                    maxLength={500}
-                    disabled={Boolean(actionLoading)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                      resize: "vertical",
-                    }}
-                  />
-                </label>
-                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="btn-sm"
-                    onClick={() => {
-                      setRejectMode(false);
-                      setRejectReason("");
-                      setActionError("");
-                    }}
-                    disabled={Boolean(actionLoading)}
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    className="btn-sm"
-                    onClick={handleReject}
-                    loading={actionLoading === "reject"}
-                    disabled={Boolean(actionLoading) && actionLoading !== "reject"}
-                  >
-                    반려 확정
-                  </Button>
-                </div>
-              </div>
-            ) : null
-          }
-          footer={
-            detail ? (
-              <>
-                {actionError && (
-                  <span
-                    className="alert alert-error"
-                    style={{ marginRight: "auto", padding: "6px 12px" }}
-                  >
-                    {actionError}
-                  </span>
-                )}
-                {detail.order_status === "REQUESTED" && !rejectMode && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      onClick={() => {
-                        setActionError("");
-                        setRejectMode(true);
-                      }}
-                      loading={actionLoading === "reject"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "reject"}
-                    >
-                      반려
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => handleApprove(detail.order_spec_id)}
-                      loading={actionLoading === "approve"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "approve"}
-                    >
-                      승인
-                    </Button>
-                  </>
-                )}
-                {detail.order_status === "APPROVED" && (
-                  <>
-                    <span className="muted" style={{ marginRight: "auto", fontSize: "13px" }}>
-                      승인 완료. 발주서를 발행하면 점포에 입고 대기로 표시됩니다.
-                    </span>
-                    <Button
-                      type="button"
-                      onClick={handleIssue}
-                      loading={actionLoading === "issue"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "issue"}
-                    >
-                      발주서 발행
-                    </Button>
-                  </>
-                )}
-                {detail.order_status === "ORDERED" && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    발주서가 발행되었습니다. (발주서 번호:{" "}
-                    <strong style={{ fontFamily: "monospace" }}>
-                      {detail.issued_order_number}
-                    </strong>
-                    )
-                  </span>
-                )}
-                {["RECEIVED", "REJECTED", "CANCELLED", "DRAFT"].includes(
-                  detail.order_status,
-                ) && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    {detail.order_status === "DRAFT"
-                      ? "점포가 아직 제출하지 않은 임시 저장 명세서입니다."
-                      : "이 상태에서는 승인·반려할 수 없습니다."}
-                  </span>
-                )}
-              </>
-            ) : null
-          }
         />
       )}
     </>

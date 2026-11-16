@@ -25,7 +25,8 @@ import {
 } from "../../components/orderSpec";
 import { getApiError } from "../../services/api";
 import { getRecommendations } from "../../services/orderService";
-import { createOrderSpec, submitOrderSpec } from "../../services/orderSpecService";
+import { getStoreProducts } from "../../services/productService";
+import { createOrderSpec } from "../../services/orderSpecService";
 import { useAuth } from "../../contexts/AuthContext";
 
 const WARNING_LABELS = {
@@ -41,10 +42,11 @@ export default function StoreOrderSpecCreate() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [recommendations, setRecommendations] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [mode, setMode] = useState("AUTO");
   const [quantities, setQuantities] = useState({});
   const [loading, setLoading] = useState(true);
-  const [savingDraft, setSavingDraft] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
   const [query, setQuery] = useState("");
@@ -88,17 +90,36 @@ export default function StoreOrderSpecCreate() {
     loadRecommendations();
   }, []);
 
+  const loadProducts = () => {
+    setLoading(true);
+    setError("");
+    getStoreProducts()
+      .then((data) => {
+        setProducts((data || []).filter((item) => item.is_registered));
+        setQuantities({});
+      })
+      .catch((err) =>
+        setError(getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다.")),
+      )
+      .finally(() => setLoading(false));
+  };
+
+  const sourceItems = useMemo(
+    () => (mode === "AUTO" ? recommendations : products),
+    [mode, recommendations, products],
+  );
+
   const draftItems = useMemo(
     () =>
-      recommendations
+      sourceItems
         .map((item) => ({
           product_id: item.product_id,
-          product_name: item.product_name,
+          product_name: item.product_name ?? item.name,
           quantity: Number(quantities[item.product_id] ?? 0),
           unit_price: Number(item.price ?? 0),
         }))
         .filter((item) => item.quantity > 0),
-    [recommendations, quantities],
+    [sourceItems, quantities],
   );
 
   const totalQuantity = draftItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -133,7 +154,7 @@ export default function StoreOrderSpecCreate() {
       quantity: item.quantity,
     }));
 
-  const handleSaveDraft = async () => {
+  const handleCreateDraft = async () => {
     setFormError("");
     const validationError = validateItems();
     if (validationError) {
@@ -142,57 +163,25 @@ export default function StoreOrderSpecCreate() {
     }
     if (
       !window.confirm(
-        `총 ${draftItems.length}개 상품 / ${totalQuantity.toLocaleString("ko-KR")}개 수량으로 발주 명세서를 임시 저장하시겠습니까?`,
+        `총 ${draftItems.length}개 상품 / ${totalQuantity.toLocaleString("ko-KR")}개 수량으로 발주 명세서를 생성하시겠습니까?`,
       )
     ) {
       return;
     }
-    setSavingDraft(true);
+    setCreating(true);
     try {
       const spec = await createOrderSpec(buildRequestItems());
       navigate("/store/orders/specs", {
         state: {
-          message: `발주 명세서(${spec.order_number})가 임시 저장되었습니다. 제출하면 본사 승인 요청이 시작됩니다.`,
+          message: `발주 명세서(${spec.order_number})가 DRAFT 상태로 생성되었습니다. 내용을 확인한 뒤 발주를 확정하세요.`,
         },
       });
     } catch (err) {
       setFormError(
-        getApiError(err, "발주 명세서 임시 저장 중 오류가 발생했습니다."),
+        getApiError(err, "발주 명세서 생성 중 오류가 발생했습니다."),
       );
     } finally {
-      setSavingDraft(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    setFormError("");
-    const validationError = validateItems();
-    if (validationError) {
-      setFormError(validationError);
-      return;
-    }
-    if (
-      !window.confirm(
-        `총 ${draftItems.length}개 상품 / ${totalQuantity.toLocaleString("ko-KR")}개 수량을 발주 요청하시겠습니까?\n제출 후에는 본사 검토 완료까지 상품과 수량을 변경할 수 없습니다.`,
-      )
-    ) {
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const spec = await createOrderSpec(buildRequestItems());
-      await submitOrderSpec(spec.order_spec_id);
-      navigate("/store/orders/specs", {
-        state: {
-          message: `발주 명세서(${spec.order_number})가 제출되었습니다. 본사 승인을 기다려 주세요.`,
-        },
-      });
-    } catch (err) {
-      setFormError(
-        getApiError(err, "발주 요청 제출 중 오류가 발생했습니다."),
-      );
-    } finally {
-      setSubmitting(false);
+      setCreating(false);
     }
   };
 
@@ -217,13 +206,13 @@ export default function StoreOrderSpecCreate() {
     <>
       <Header
         title="발주 명세서 작성"
-        description="자동 발주 추천 결과를 기반으로 발주 명세서를 작성하고 본사에 제출합니다."
+        description="자동 추천 또는 상품 직접 선택으로 DRAFT 명세서를 생성합니다."
       />
 
       <div className="stats-grid">
         <StatCard
           label="상품 수"
-          value={totalCount.toLocaleString()}
+          value={(mode === "AUTO" ? totalCount : products.length).toLocaleString()}
           icon={ClipboardList}
           tone="blue"
         />
@@ -243,21 +232,48 @@ export default function StoreOrderSpecCreate() {
 
       <div className="toolbar">
         <div className="toolbar-left">
-          <SearchInput
-            placeholder="상품명, 카테고리 검색"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onSearch={() => loadRecommendations({ targetPage: 1 })}
-          />
           <Button
             type="button"
-            variant="secondary"
-            className="btn-sm"
-            onClick={() => loadRecommendations({ targetPage: 1 })}
-            disabled={loading || savingDraft || submitting}
+            variant={mode === "AUTO" ? "primary" : "secondary"}
+            onClick={() => {
+              setMode("AUTO");
+              setQuantities({});
+              loadRecommendations({ targetPage: 1 });
+            }}
+            disabled={creating}
           >
-            조회
+            자동발주
           </Button>
+          <Button
+            type="button"
+            variant={mode === "MANUAL" ? "primary" : "secondary"}
+            onClick={() => {
+              setMode("MANUAL");
+              loadProducts();
+            }}
+            disabled={creating}
+          >
+            수동발주
+          </Button>
+          {mode === "AUTO" && (
+            <>
+              <SearchInput
+                placeholder="상품명, 카테고리 검색"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onSearch={() => loadRecommendations({ targetPage: 1 })}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                className="btn-sm"
+                onClick={() => loadRecommendations({ targetPage: 1 })}
+                disabled={loading || creating}
+              >
+                조회
+              </Button>
+            </>
+          )}
         </div>
         <div className="toolbar-right">
           <span className="muted" style={{ fontSize: "12px", fontWeight: 600 }}>
@@ -268,7 +284,7 @@ export default function StoreOrderSpecCreate() {
             variant="secondary"
             className="btn-sm"
             onClick={() => setPreviewOpen(true)}
-            disabled={loading || savingDraft || submitting || !draftItems.length}
+            disabled={loading || creating || !draftItems.length}
           >
             <Eye size={16} />
             미리보기
@@ -277,27 +293,22 @@ export default function StoreOrderSpecCreate() {
             type="button"
             variant="secondary"
             className="btn-sm"
-            onClick={handleSaveDraft}
-            loading={savingDraft}
-            disabled={loading || submitting || !draftItems.length}
+            onClick={handleCreateDraft}
+            loading={creating}
+            disabled={loading || creating || !draftItems.length}
           >
-            임시 저장
-          </Button>
-          <Button
-            type="button"
-            className="btn-sm"
-            onClick={handleSubmit}
-            loading={submitting}
-            disabled={loading || savingDraft || !draftItems.length}
-          >
-            발주 요청 제출
+            명세서 생성
           </Button>
           <Button
             type="button"
             variant="secondary"
             className="btn-sm"
-            onClick={() => loadRecommendations({ targetPage: page })}
-            disabled={loading || savingDraft || submitting}
+            onClick={() =>
+              mode === "AUTO"
+                ? loadRecommendations({ targetPage: page })
+                : loadProducts()
+            }
+            disabled={loading || creating}
           >
             <RefreshCw size={16} className={loading ? "spin" : ""} />
             새로고침
@@ -313,7 +324,9 @@ export default function StoreOrderSpecCreate() {
 
       <Card className="table-card">
         {loading ? (
-          <Loading label="발주 추천을 불러오는 중..." />
+          <Loading
+            label={mode === "AUTO" ? "발주 추천을 불러오는 중..." : "상품 목록을 불러오는 중..."}
+          />
         ) : error ? (
           <div style={{ padding: "24px" }}>
             <div className="alert alert-error">{error}</div>
@@ -327,7 +340,7 @@ export default function StoreOrderSpecCreate() {
               </button>
             </div>
           </div>
-        ) : recommendations.length ? (
+        ) : sourceItems.length ? (
           <div className="table-wrap">
             <table>
               <thead>
@@ -344,7 +357,7 @@ export default function StoreOrderSpecCreate() {
                 </tr>
               </thead>
               <tbody>
-                {recommendations.map((item) => {
+                {sourceItems.map((item) => {
                   const quantity = Number(quantities[item.product_id] ?? 0);
                   const hasWarning = item.data_warning?.length > 0;
                   return (
@@ -353,7 +366,7 @@ export default function StoreOrderSpecCreate() {
                         #{item.product_id}
                       </td>
                       <td>
-                        <strong>{item.product_name}</strong>
+                        <strong>{item.product_name ?? item.name}</strong>
                       </td>
                       <td>
                         <span
@@ -364,12 +377,16 @@ export default function StoreOrderSpecCreate() {
                         </span>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        {Number(item.current_stock).toLocaleString("ko-KR")}
+                        {mode === "AUTO"
+                          ? Number(item.current_stock).toLocaleString("ko-KR")
+                          : "-"}
                       </td>
                       <td style={{ textAlign: "right", color: item.needs_order ? "#b45309" : "#64748b" }}>
-                        {item.needs_order
+                        {mode === "AUTO" && item.needs_order
                           ? Number(item.order_quantity).toLocaleString("ko-KR")
-                          : "발주 불필요"}
+                          : mode === "AUTO"
+                            ? "발주 불필요"
+                            : "-"}
                       </td>
                       <td style={{ textAlign: "right" }}>
                         {Number(item.price ?? 0).toLocaleString("ko-KR")}원
@@ -385,7 +402,7 @@ export default function StoreOrderSpecCreate() {
                               event.target.value.replace(/[^0-9]/g, ""),
                             )
                           }
-                          disabled={savingDraft || submitting}
+                          disabled={creating}
                           style={{
                             width: "84px",
                             textAlign: "right",
@@ -399,7 +416,7 @@ export default function StoreOrderSpecCreate() {
                         {formatAmount(quantity * Number(item.price ?? 0))}
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        {hasWarning ? (
+                        {mode === "AUTO" && hasWarning ? (
                           <span
                             className="badge"
                             style={{ background: "#fef3c7", color: "#b45309" }}
@@ -421,19 +438,19 @@ export default function StoreOrderSpecCreate() {
           </div>
         ) : (
           <EmptyState>
-            {query.trim()
+            {mode === "AUTO" && query.trim()
               ? "검색 결과가 없습니다."
               : "발주 추천을 계산할 재고 상품이 없습니다."}
           </EmptyState>
         )}
       </Card>
 
-      {!loading && !error && recommendations.length > 0 && (
+      {!loading && !error && mode === "AUTO" && recommendations.length > 0 && (
         <Pagination
           page={page}
           totalPages={totalPages}
           total={totalCount}
-          disabled={loading || savingDraft || submitting}
+          disabled={loading || creating}
           onChange={(nextPage) => loadRecommendations({ targetPage: nextPage })}
         />
       )}
@@ -497,19 +514,11 @@ export default function StoreOrderSpecCreate() {
             </Button>
             <Button
               type="button"
-              onClick={handleSaveDraft}
-              loading={savingDraft}
-              disabled={submitting}
+              onClick={handleCreateDraft}
+              loading={creating}
+              disabled={creating}
             >
-              임시 저장
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              loading={submitting}
-              disabled={savingDraft}
-            >
-              발주 요청 제출
+              명세서 생성
             </Button>
           </div>
         </Modal>

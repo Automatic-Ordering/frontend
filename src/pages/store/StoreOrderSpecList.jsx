@@ -19,9 +19,9 @@ import {
 import { getApiError } from "../../services/api";
 import {
   cancelOrderSpec,
+  confirmOrderSpec,
   getOrderSpecDetail,
   getOrderSpecs,
-  submitOrderSpec,
   updateOrderSpecItems,
 } from "../../services/orderSpecService";
 
@@ -108,7 +108,7 @@ export default function StoreOrderSpecList() {
   };
 
   const requestedCount = useMemo(
-    () => specs.filter((spec) => spec.order_status === "REQUESTED").length,
+    () => specs.filter((spec) => spec.order_status === "PENDING_RECEIPT").length,
     [specs],
   );
   const draftCount = useMemo(
@@ -160,23 +160,23 @@ export default function StoreOrderSpecList() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleConfirm = async () => {
     setActionError("");
     if (
       !window.confirm(
-        "발주 명세서를 본사에 제출하시겠습니까? 제출 후에는 상품과 수량을 변경할 수 없습니다.",
+        "발주 명세서를 확정하시겠습니까? 확정 후에는 상품과 수량을 변경할 수 없습니다.",
       )
     ) {
       return;
     }
-    setActionLoading("submit");
+    setActionLoading("confirm");
     try {
-      await submitOrderSpec(detail.order_spec_id);
+      await confirmOrderSpec(detail.order_spec_id);
       setEditing(false);
       await loadDetail(detail.order_spec_id);
       refreshList();
     } catch (err) {
-      setActionError(getApiError(err, "발주 요청 제출 중 오류가 발생했습니다."));
+      setActionError(getApiError(err, "발주 확정 중 오류가 발생했습니다."));
     } finally {
       setActionLoading("");
     }
@@ -204,7 +204,7 @@ export default function StoreOrderSpecList() {
     <>
       <Header
         title="발주 내역"
-        description="작성·제출한 발주 명세서의 승인 상태와 반려 사유를 확인합니다."
+        description="작성 중, 입고 대기, 입고 완료 발주 명세서를 확인합니다."
       />
 
       {notice && (
@@ -227,7 +227,7 @@ export default function StoreOrderSpecList() {
           tone="purple"
         />
         <StatCard
-          label="승인 대기 (현재 페이지)"
+          label="입고 대기 (현재 페이지)"
           value={requestedCount}
           icon={ClipboardList}
           tone="orange"
@@ -468,11 +468,11 @@ export default function StoreOrderSpecList() {
                     </Button>
                     <Button
                       type="button"
-                      onClick={handleSubmit}
-                      loading={actionLoading === "submit"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "submit"}
+                      onClick={handleConfirm}
+                      loading={actionLoading === "confirm"}
+                      disabled={Boolean(actionLoading) && actionLoading !== "confirm"}
                     >
-                      발주 요청 제출
+                      발주 확정
                     </Button>
                     <Button
                       type="button"
@@ -485,35 +485,28 @@ export default function StoreOrderSpecList() {
                     </Button>
                   </>
                 )}
-                {detail.order_status === "REQUESTED" && (
+                {detail.order_status === "PENDING_RECEIPT" && (
                   <>
                     <span className="muted" style={{ marginRight: "auto", fontSize: "13px" }}>
-                      본사 승인 검토 중입니다.
+                      입고 대기 중입니다. 입고 관리 화면에서 실제 입고 수량을 입력하세요.
                     </span>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      onClick={handleCancel}
-                      loading={actionLoading === "cancel"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "cancel"}
+                    <Link
+                      to="/store/orders/receipts"
+                      className="btn btn-primary"
+                      style={{ textDecoration: "none" }}
                     >
-                      취소
-                    </Button>
+                      입고 처리
+                    </Link>
                   </>
+                )}
+                {detail.order_status === "REQUESTED" && (
+                  <span className="muted" style={{ fontSize: "13px" }}>
+                    레거시 승인 대기 상태입니다.
+                  </span>
                 )}
                 {detail.order_status === "REJECTED" && (
                   <span className="muted" style={{ fontSize: "13px" }}>
                     반려된 발주입니다. 수량을 조정해 새 명세서를 작성해 주세요.
-                  </span>
-                )}
-                {detail.order_status === "APPROVED" && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    본사 승인이 완료되었습니다. 발주서 발행을 기다려 주세요.
-                  </span>
-                )}
-                {detail.order_status === "ORDERED" && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    발주서가 발행되었습니다. 입고 관리 화면에서 입고를 처리할 수 있습니다.
                   </span>
                 )}
                 {detail.order_status === "RECEIVED" && (

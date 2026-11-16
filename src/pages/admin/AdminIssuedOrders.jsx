@@ -20,7 +20,6 @@ import { getApiError } from "../../services/api";
 import {
   getAdminOrderSpecs,
   getAdminOrderSpecDetail,
-  issueOrderSpec,
 } from "../../services/orderSpecService";
 
 const PAGE_SIZE = 20;
@@ -35,14 +34,10 @@ export default function AdminIssuedOrders() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [rowBusyId, setRowBusyId] = useState(null);
-
   const [detailId, setDetailId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const [actionLoading, setActionLoading] = useState("");
-  const [actionError, setActionError] = useState("");
 
   const loadSpecs = ({ status = statusFilter, targetPage = 1 } = {}) => {
     setLoading(true);
@@ -86,8 +81,6 @@ export default function AdminIssuedOrders() {
   const openDetail = async (specId) => {
     setDetailId(specId);
     setDetail(null);
-    setActionError("");
-    setActionLoading("");
     await loadDetail(specId);
   };
 
@@ -95,50 +88,17 @@ export default function AdminIssuedOrders() {
     setDetailId(null);
     setDetail(null);
     setDetailError("");
-    setActionLoading("");
-    setActionError("");
   };
 
   const issuedCount = specs.filter(
     (spec) => spec.order_status === "ORDERED",
   ).length;
 
-  const refreshList = () => loadSpecs({ targetPage: page });
-
-  const handleIssue = async (specId) => {
-    const spec =
-      detail?.order_spec_id === specId
-        ? detail
-        : specs.find((item) => item.order_spec_id === specId);
-    if (
-      !window.confirm(
-        `발주서를 발행하시겠습니까?\n발주 번호: ${spec?.order_number ?? specId}\n발행 후 점포에 입고 대기로 표시됩니다.`,
-      )
-    ) {
-      return;
-    }
-    const isModalAction = detailId === specId;
-    setActionLoading(isModalAction ? "issue" : "");
-    setRowBusyId(isModalAction ? null : specId);
-    try {
-      await issueOrderSpec(specId);
-      if (isModalAction) await loadDetail(specId);
-      refreshList();
-    } catch (err) {
-      const message = getApiError(err, "발주서 발행 중 오류가 발생했습니다.");
-      if (isModalAction) setActionError(message);
-      else setError(message);
-    } finally {
-      setActionLoading("");
-      setRowBusyId(null);
-    }
-  };
-
   return (
     <>
       <Header
         title="발주서 관리"
-        description="승인된 발주의 발주서 발행 상태를 관리하고 발주서를 확인합니다."
+        description="발주서 발행 현황을 조회하고 발주서 상세 내용을 확인합니다."
       />
 
       <div className="stats-grid">
@@ -276,20 +236,9 @@ export default function AdminIssuedOrders() {
                           type="button"
                           className="btn btn-secondary btn-sm"
                           onClick={() => openDetail(spec.order_spec_id)}
-                          disabled={rowBusyId === spec.order_spec_id}
                         >
                           상세
                         </button>
-                        {spec.order_status === "APPROVED" && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleIssue(spec.order_spec_id)}
-                            disabled={rowBusyId === spec.order_spec_id}
-                          >
-                            {rowBusyId === spec.order_spec_id ? "처리 중..." : "발행"}
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -301,7 +250,7 @@ export default function AdminIssuedOrders() {
           <EmptyState>
             {statusFilter
               ? `해당 상태의 발주서가 없습니다.`
-              : "발주서가 없습니다. 발주 승인 관리에서 승인 후 발행할 수 있습니다."}
+              : "발주서가 없습니다."}
           </EmptyState>
         )}
         {!loading && !error && specs.length > 0 && (
@@ -323,45 +272,6 @@ export default function AdminIssuedOrders() {
           error={detailError}
           onRetry={() => loadDetail(detailId)}
           onClose={closeDetail}
-          footer={
-            detail ? (
-              <>
-                {actionError && (
-                  <span
-                    className="alert alert-error"
-                    style={{ marginRight: "auto", padding: "6px 12px" }}
-                  >
-                    {actionError}
-                  </span>
-                )}
-                {detail.order_status === "APPROVED" && (
-                  <>
-                    <span className="muted" style={{ marginRight: "auto", fontSize: "13px" }}>
-                      승인 완료된 발주입니다. 발주서를 발행하면 점포에 입고 대기로 표시됩니다.
-                    </span>
-                    <Button
-                      type="button"
-                      onClick={() => handleIssue(detail.order_spec_id)}
-                      loading={actionLoading === "issue"}
-                      disabled={Boolean(actionLoading) && actionLoading !== "issue"}
-                    >
-                      발주서 발행
-                    </Button>
-                  </>
-                )}
-                {detail.order_status === "ORDERED" && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    발주서 발행 완료. 점포 입고 처리를 기다리고 있습니다.
-                  </span>
-                )}
-                {detail.order_status === "RECEIVED" && (
-                  <span className="muted" style={{ fontSize: "13px" }}>
-                    입고가 완료되었습니다.
-                  </span>
-                )}
-              </>
-            ) : null
-          }
         />
       )}
     </>

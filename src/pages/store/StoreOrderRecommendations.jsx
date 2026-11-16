@@ -194,7 +194,7 @@ export default function StoreOrderRecommendations() {
       const spec = await createOrderSpec(pendingItems);
       navigate("/store/orders/specs", {
         state: {
-          message: `발주 명세서(${spec.order_number})가 임시 저장되었습니다. 발주 내역 화면에서 검토 후 제출하세요.`,
+          message: `발주 명세서(${spec.order_number})가 DRAFT 상태로 생성되었습니다. 발주 내역에서 검토 후 확정하세요.`,
         },
       });
     } catch (err) {
@@ -326,13 +326,13 @@ export default function StoreOrderRecommendations() {
                     공급업체
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
-                    3일 합계
+                    7일 합계
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
                     일평균
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
-                    예상(3일)
+                    예상(1일)
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
                     안전재고
@@ -384,13 +384,13 @@ export default function StoreOrderRecommendations() {
                         <span className="text-xs">{pd.supplier || "-"}</span>
                       </td>
                       <td className="align-middle text-right">
-                        {Number(item.predicted_demand * 3).toLocaleString()}
+                        {Number(item.predicted_demand * 7).toLocaleString()}
                       </td>
                       <td className="align-middle text-right">
                         {Number(item.predicted_demand).toFixed(2)}
                       </td>
                       <td className="align-middle text-right">
-                        {Number(item.predicted_demand * 3).toLocaleString()}
+                        {Number(item.predicted_demand).toLocaleString()}
                       </td>
                       <td className="align-middle text-right">
                         {Number(item.applied_safety_stock).toLocaleString()}

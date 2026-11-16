@@ -3,7 +3,6 @@ import {
   Boxes,
   ClipboardList,
   FilePlus2,
-  FileText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -26,8 +25,6 @@ export function Sidebar({ admin = false }) {
   const links = admin
     ? [
         ["/admin", "대시보드", LayoutDashboard],
-        ["/admin/orders", "발주 승인 관리", ClipboardList],
-        ["/admin/orders/issued", "발주서 관리", FileText],
         ["/admin/stores", "점포 관리", Store],
         ["/admin/stores/new", "점포 등록", Store],
         ["/admin/products", "상품 관리", Package],
