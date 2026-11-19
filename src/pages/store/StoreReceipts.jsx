@@ -66,11 +66,12 @@ export default function StoreReceipts() {
     try {
       const data = await getOrderSpecDetail(specId);
       setDetail(data);
+      // [수정] 초기 입고 수량을 발주 수량(order_quantity)으로 자동 세팅
       setReceived(
         Object.fromEntries(
           (data.items ?? []).map((item) => [
             item.product_id,
-            "",
+            (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0),
           ]),
         ),
       );
@@ -86,7 +87,12 @@ export default function StoreReceipts() {
   const openReceipt = (specId) => {
     setReceiptSpecId(specId);
     setDetail(null);
-    setReceived({});
+    // [수정] 초기값을 발주 수량으로 재설정
+    setReceived(
+      Object.fromEntries(
+        (detail?.items ?? []).map((item) => [item.product_id, (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)]),
+      ),
+    );
     setActionError("");
     setComparison(null);
     loadDetail(specId);
@@ -96,29 +102,38 @@ export default function StoreReceipts() {
     setReceiptSpecId(null);
     setDetail(null);
     setDetailError("");
-    setActionError("");
     setComparison(null);
     if (comparison) loadReceipts({ targetPage: page });
   };
 
   const handleReceivedChange = (productId, value) => {
-    setReceived((prev) => ({ ...prev, [productId]: value }));
+    // [수정] 값은 항상 0 이상의 정수로 정규화: Math.max(0, Math.floor(Number(value) || 0))
+    const normalizedValue = Math.max(0, Math.floor(Number(value) || 0));
+    setReceived((prev) => ({ ...prev, [productId]: normalizedValue }));
+  };
+
+  // [추가] 발주 수량으로 일괄 채우기
+  const handleFillOrdered = () => {
+    if (!detail || !detail.items) return;
+    const newReceived = {};
+    detail.items.forEach((item) => {
+      newReceived[item.product_id] = (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0);
+    });
+    setReceived(newReceived);
   };
 
   const handleReceive = async () => {
     setActionError("");
     const rawItems = (detail?.items ?? []).map((item) => ({
       product_id: item.product_id,
-      value: received[item.product_id] ?? "",
+      value: received[item.product_id] ?? (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0),
     }));
-    if (
-      rawItems.some(
-        (item) =>
-          item.value === "" ||
-          !Number.isInteger(Number(item.value)) ||
-          Number(item.value) < 0,
-      )
-    ) {
+    // [수정] 검증: 0 이상의 정수만 허용, 빈값은 order_quantity로 정규화
+    const isValid = rawItems.every(
+      (item) =>
+        Number.isInteger(Number(item.value)) && Number(item.value) >= 0,
+    );
+    if (!isValid) {
       setActionError("입고 수량은 0 이상의 정수로 모든 상품에 입력해야 합니다.");
       return;
     }
@@ -395,13 +410,13 @@ export default function StoreReceipts() {
                           <strong>{item.product_name}</strong>
                         </td>
                         <td style={{ textAlign: "right" }}>
-                          {Number(item.order_quantity).toLocaleString("ko-KR")}
+                          {Number((item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)).toLocaleString("ko-KR")}
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={received[item.product_id] ?? ""}
+                            value={received[item.product_id] ?? (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)}
                             onChange={(event) =>
                               handleReceivedChange(
                                 item.product_id,
@@ -442,6 +457,12 @@ export default function StoreReceipts() {
                   disabled={submitting}
                 >
                   닫기
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleFillOrdered}
+                >
+                  주문 수량 일괄 채우기
                 </Button>
                 <Button
                   type="button"
