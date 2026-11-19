@@ -16,32 +16,39 @@ import {
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
+const STORE_LINKS = [
+  ["/store", "대시보드", LayoutDashboard],
+  ["/store/inventory", "재고 관리", Boxes],
+  ["/store/sales", "판매 내역", Receipt],
+  ["/store/sales/new", "판매 등록", Receipt],
+  ["/store/orders/specs/new", "명세서 작성", FilePlus2],
+  ["/store/orders/specs", "발주 내역", ClipboardList],
+  ["/store/orders/receipts", "입고 관리", PackageCheck],
+  ["/store/orders/settings", "발주 설정", Settings],
+  ["/store/settings", "점포 설정", Settings],
+];
+
+const ADMIN_LINKS = [
+  ["/admin", "대시보드", LayoutDashboard],
+  ["/admin/stores", "점포 관리", Store],
+  ["/admin/products", "상품 관리", Package],
+  ["/admin/orders/specs", "발주 명세서 관리", FilePlus2],
+  ["/admin/orders", "승인 내역", Receipt],
+  ["/admin/settings", "시스템 설정", Settings],
+];
+
 export function Sidebar({ admin = false }) {
-  const [open, setOpen] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const links = admin
-    ? [
-        ["/admin", "대시보드", LayoutDashboard],
-        ["/admin/stores", "점포 관리", Store],
-        ["/admin/stores/new", "점포 등록", Store],
-        ["/admin/products", "상품 관리", Package],
-      ]
-    : [
-        ["/store", "대시보드", LayoutDashboard],
-        ["/store/inventory", "재고 관리", Boxes],
-        ["/store/sales", "판매 내역", Receipt],
-        ["/store/sales/new", "판매 등록", Receipt],
-        ["/store/orders/specs/new", "명세서 작성", FilePlus2],
-        ["/store/orders/specs", "발주 내역", ClipboardList],
-        ["/store/orders/settings", "발주 설정", Settings],
-        ["/store/orders/receipts", "입고 관리", PackageCheck],
-        ["/store/settings", "점포 설정", Settings],
-      ];
+  const [open, setOpen] = useState(false);
+
+  const links = admin ? ADMIN_LINKS : STORE_LINKS;
+
   const signOut = () => {
     logout();
     navigate(admin ? "/admin/login" : "/login");
   };
+
   return (
     <>
       <button
@@ -64,12 +71,7 @@ export function Sidebar({ admin = false }) {
         </div>
         <nav>
           {links.map(([to, label, Icon]) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/admin" || to === "/store"}
-              onClick={() => setOpen(false)}
-            >
+            <NavLink key={to} to={to} end onClick={() => setOpen(false)}>
               <Icon size={18} />
               {label}
             </NavLink>

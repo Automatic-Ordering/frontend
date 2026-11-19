@@ -10,10 +10,7 @@ import {
 } from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
-import {
-  SpecStatusBadge,
-  formatAmount,
-} from "../../components/orderSpec";
+import { SpecStatusBadge, formatAmount } from "../../components/orderSpec";
 import { getApiError } from "../../services/api";
 import {
   getPendingReceipts,
@@ -51,7 +48,9 @@ export default function StoreReceipts() {
         setPage(Number(data.page ?? targetPage));
       })
       .catch((err) =>
-        setError(getApiError(err, "입고 대기 목록을 불러오는 중 오류가 발생했습니다.")),
+        setError(
+          getApiError(err, "입고 대기 목록을 불러오는 중 오류가 발생했습니다."),
+        ),
       )
       .finally(() => setLoading(false));
   };
@@ -66,12 +65,12 @@ export default function StoreReceipts() {
     try {
       const data = await getOrderSpecDetail(specId);
       setDetail(data);
-      // [수정] 초기 입고 수량을 발주 수량(order_quantity)으로 자동 세팅
+      // 초기 입고 수량을 발주 수량으로 자동 세팅
       setReceived(
         Object.fromEntries(
           (data.items ?? []).map((item) => [
             item.product_id,
-            (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0),
+            item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0,
           ]),
         ),
       );
@@ -87,12 +86,7 @@ export default function StoreReceipts() {
   const openReceipt = (specId) => {
     setReceiptSpecId(specId);
     setDetail(null);
-    // [수정] 초기값을 발주 수량으로 재설정
-    setReceived(
-      Object.fromEntries(
-        (detail?.items ?? []).map((item) => [item.product_id, (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)]),
-      ),
-    );
+    setReceived({});
     setActionError("");
     setComparison(null);
     loadDetail(specId);
@@ -107,34 +101,30 @@ export default function StoreReceipts() {
   };
 
   const handleReceivedChange = (productId, value) => {
-    // [수정] 값은 항상 0 이상의 정수로 정규화: Math.max(0, Math.floor(Number(value) || 0))
+    // 값은 항상 0 이상의 정수로 정규화
     const normalizedValue = Math.max(0, Math.floor(Number(value) || 0));
     setReceived((prev) => ({ ...prev, [productId]: normalizedValue }));
-  };
-
-  // [추가] 발주 수량으로 일괄 채우기
-  const handleFillOrdered = () => {
-    if (!detail || !detail.items) return;
-    const newReceived = {};
-    detail.items.forEach((item) => {
-      newReceived[item.product_id] = (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0);
-    });
-    setReceived(newReceived);
   };
 
   const handleReceive = async () => {
     setActionError("");
     const rawItems = (detail?.items ?? []).map((item) => ({
       product_id: item.product_id,
-      value: received[item.product_id] ?? (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0),
+      value:
+        received[item.product_id] ??
+        item.order_quantity ??
+        item.ordered_quantity ??
+        item.quantity ??
+        0,
     }));
-    // [수정] 검증: 0 이상의 정수만 허용, 빈값은 order_quantity로 정규화
+    // 검증: 0 이상의 정수만 허용
     const isValid = rawItems.every(
-      (item) =>
-        Number.isInteger(Number(item.value)) && Number(item.value) >= 0,
+      (item) => Number.isInteger(Number(item.value)) && Number(item.value) >= 0,
     );
     if (!isValid) {
-      setActionError("입고 수량은 0 이상의 정수로 모든 상품에 입력해야 합니다.");
+      setActionError(
+        "입고 수량은 0 이상의 정수로 모든 상품에 입력해야 합니다.",
+      );
       return;
     }
     const items = rawItems.map((item) => ({
@@ -264,7 +254,8 @@ export default function StoreReceipts() {
           </div>
         ) : (
           <EmptyState>
-            입고 대기 중인 발주가 없습니다. 발주를 확정하면 이 화면에 표시됩니다.
+            입고 대기 중인 발주가 없습니다. 발주를 확정하면 이 화면에
+            표시됩니다.
           </EmptyState>
         )}
         {!loading && specs.length > 0 && (
@@ -281,7 +272,9 @@ export default function StoreReceipts() {
       {receiptSpecId && (
         <Modal
           title={
-            comparison ? "입고 완료" : `입고 처리 - ${detail?.order_number ?? ""}`
+            comparison
+              ? "입고 완료"
+              : `입고 처리 - ${detail?.order_number ?? ""}`
           }
           onClose={closeReceipt}
           maxWidth="760px"
@@ -328,7 +321,9 @@ export default function StoreReceipts() {
                           {Number(row.order_quantity).toLocaleString("ko-KR")}
                         </td>
                         <td style={{ textAlign: "right" }}>
-                          {Number(row.received_quantity).toLocaleString("ko-KR")}
+                          {Number(row.received_quantity).toLocaleString(
+                            "ko-KR",
+                          )}
                         </td>
                         <td
                           style={{
@@ -386,7 +381,10 @@ export default function StoreReceipts() {
                 </span>
               </div>
               {actionError && (
-                <div className="alert alert-error" style={{ marginBottom: "12px" }}>
+                <div
+                  className="alert alert-error"
+                  style={{ marginBottom: "12px" }}
+                >
                   {actionError}
                 </div>
               )}
@@ -403,20 +401,34 @@ export default function StoreReceipts() {
                   <tbody>
                     {detail.items.map((item) => (
                       <tr key={item.item_id}>
-                        <td className="muted" style={{ fontFamily: "monospace" }}>
+                        <td
+                          className="muted"
+                          style={{ fontFamily: "monospace" }}
+                        >
                           #{item.product_id}
                         </td>
                         <td>
                           <strong>{item.product_name}</strong>
                         </td>
                         <td style={{ textAlign: "right" }}>
-                          {Number((item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)).toLocaleString("ko-KR")}
+                          {Number(
+                            item.order_quantity ??
+                              item.ordered_quantity ??
+                              item.quantity ??
+                              0,
+                          ).toLocaleString("ko-KR")}
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={received[item.product_id] ?? (item.order_quantity ?? item.ordered_quantity ?? item.quantity ?? 0)}
+                            value={
+                              received[item.product_id] ??
+                              item.order_quantity ??
+                              item.ordered_quantity ??
+                              item.quantity ??
+                              0
+                            }
                             onChange={(event) =>
                               handleReceivedChange(
                                 item.product_id,
@@ -438,7 +450,10 @@ export default function StoreReceipts() {
                   </tbody>
                 </table>
               </div>
-              <p className="muted" style={{ fontSize: "12px", marginTop: "10px" }}>
+              <p
+                className="muted"
+                style={{ fontSize: "12px", marginTop: "10px" }}
+              >
                 모든 상품의 입고 수량을 입력해야 합니다. 입고 완료 시 실제 입고
                 수량만큼 재고가 증가합니다.
               </p>
@@ -457,12 +472,6 @@ export default function StoreReceipts() {
                   disabled={submitting}
                 >
                   닫기
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleFillOrdered}
-                >
-                  주문 수량 일괄 채우기
                 </Button>
                 <Button
                   type="button"
