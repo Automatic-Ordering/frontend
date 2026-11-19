@@ -40,3 +40,11 @@ export const getStoreProductsPage = async ({ page, limit, search } = {}) => {
   if (search) params.search = search;
   return unwrap(await api.get("/store/products", { params }));
 };
+
+/**
+ * 상품 안전 재고 값 수정
+ * PATCH /api/store/products/:productId/safety_stock  body: { safety_stock }
+ */
+export const patchProductSafetyStock = async (productId, safetyStock) => {
+  return unwrap(await api.patch(`/api/store/products/${productId}/safety_stock`, { safety_stock: safetyStock }));
+};

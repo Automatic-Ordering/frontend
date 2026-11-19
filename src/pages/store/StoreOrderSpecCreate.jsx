@@ -1,528 +1,428 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  AlertTriangle,
-  ClipboardList,
-  Eye,
-  RefreshCw,
-  ShoppingCart,
-} from "lucide-react";
-import {
-  Button,
-  Card,
-  EmptyState,
-  Loading,
-  Modal,
-  SearchInput,
-  StatCard,
-} from "../../components/ui";
+import { ClipboardList, ShoppingCart } from "lucide-react";
+import { Button, Card, Loading, StatCard } from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
-import {
-  SpecItemsTable,
-  SpecStatusBadge,
-  formatAmount,
-} from "../../components/orderSpec";
+import { formatAmount } from "../../components/orderSpec";
 import { getApiError } from "../../services/api";
 import { getRecommendations } from "../../services/orderService";
 import { getStoreProducts } from "../../services/productService";
 import { createOrderSpec } from "../../services/orderSpecService";
-import { useAuth } from "../../contexts/AuthContext";
-
-const WARNING_LABELS = {
-  NO_SALES_DATA: "판매 데이터 없음",
-  INSUFFICIENT_SALES_DATA: "판매 데이터 부족",
-  INSUFFICIENT_MOVING_AVERAGE_WINDOW: "7일 미만 판매 데이터",
-  NO_SAME_WEEKDAY_DATA: "동요일 판매 데이터 없음",
-};
 
 const PAGE_SIZE = 20;
 
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getRecentSales = (item) =>
+  item.recent_7d_sales ??
+  item.recent_sales_quantity ??
+  item.recent_sales ??
+  item.weekly_sales_quantity ??
+  null;
+
+const calculateRecommendedQuantity = (recentSales, safetyStock, currentStock) =>
+  Math.max(0, recentSales + safetyStock - currentStock);
+
+const mergeProductData = (products, recommendations) => {
+  const recommendationsById = new Map(
+    recommendations.map((item) => [String(item.product_id), item]),
+  );
+
+  return products.map((product) => {
+    const recommendation = recommendationsById.get(String(product.product_id)) ?? {};
+    const recentSales = getRecentSales(recommendation) ?? getRecentSales(product);
+    const safetyStock = toNumber(
+      recommendation.safety_stock ?? product.safety_stock ?? 0,
+    );
+    const currentStock = toNumber(
+      recommendation.current_stock ?? product.current_stock,
+    );
+
+    const recommendedQuantity = calculateRecommendedQuantity(
+      recentSales,
+      safetyStock,
+      currentStock,
+    );
+
+    return {
+      product_id: product.product_id,
+      product_code: recommendation.product_code ?? product.product_code ?? product.code,
+      product_name: recommendation.product_name ?? product.product_name,
+      category: recommendation.category ?? product.category ?? "미분류",
+      price: toNumber(recommendation.price ?? product.price),
+      current_stock: currentStock,
+      safety_stock: safetyStock,
+      recent_7d_sales: recentSales,
+      recommended_quantity: recommendedQuantity,
+      quantity: String(recommendedQuantity),
+    };
+  });
+};
+
+const fetchAllRecommendations = async () => {
+  const firstPage = await getRecommendations({ page: 1, limit: 100 });
+  const totalPages = Number(firstPage.total_pages ?? 1);
+  const remainingPages =
+    totalPages > 1
+      ? await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, index) =>
+            getRecommendations({ page: index + 2, limit: 100 }),
+          ),
+        )
+      : [];
+  return [
+    ...(firstPage.items ?? []),
+    ...remainingPages.flatMap((page) => page.items ?? []),
+  ];
+};
+
 export default function StoreOrderSpecCreate() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [recommendations, setRecommendations] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [mode, setMode] = useState("AUTO");
-  const [quantities, setQuantities] = useState({});
+  const [orderItems, setOrderItems] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-  const [formError, setFormError] = useState("");
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  const loadRecommendations = ({ targetPage = 1, search = query.trim() } = {}) => {
-    setLoading(true);
-    setError("");
-    getRecommendations({
-      page: targetPage,
-      limit: PAGE_SIZE,
-      search: search || undefined,
-    })
-      .then((data) => {
-        const items = data.items || [];
-        setRecommendations(items);
-        setQuantities((prev) => {
-          const next = { ...prev };
-          items.forEach((item) => {
-            const key = String(item.product_id);
-            if (!(key in next)) next[key] = String(item.order_quantity ?? 0);
-          });
-          return next;
-        });
-        setTotalCount(Number(data.total ?? 0));
-        setTotalPages(Number(data.total_pages ?? 0));
-        setPage(Number(data.page ?? targetPage));
-      })
-      .catch((err) =>
-        setError(
-          getApiError(err, "발주 추천 목록을 불러오는 중 오류가 발생했습니다."),
-        ),
-      )
-      .finally(() => setLoading(false));
-  };
+  const [activeTab, setActiveTab] = useState("specs-create");
 
   useEffect(() => {
-    loadRecommendations();
+    let cancelled = false;
+    const loadInitialData = async () => {
+      const [productData, recommendations] = await Promise.all([
+        getStoreProducts(),
+        fetchAllRecommendations(),
+      ]);
+
+      if (!cancelled) {
+        const registeredProducts = (productData || []).filter(
+          (item) => item.is_registered,
+        );
+        setOrderItems(mergeProductData(registeredProducts, recommendations));
+      }
+
+      loadInitialData()
+        .catch((err) => {
+          if (cancelled) return;
+          setError(getApiError(err, "발주 화면 데이터를 불러오지 못했습니다."));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    };
+
+    loadInitialData();
   }, []);
 
-  const loadProducts = () => {
-    setLoading(true);
-    setError("");
-    getStoreProducts()
-      .then((data) => {
-        setProducts((data || []).filter((item) => item.is_registered));
-        setQuantities({});
-      })
-      .catch((err) =>
-        setError(getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다.")),
-      )
-      .finally(() => setLoading(false));
-  };
+  // 카테고리를 동적으로 추출 (하드코딩 금지)
+  const allCategories = useMemo(() => {
+    const categorySet = new Set();
+    orderItems.forEach((item) => {
+      if (item.category) categorySet.add(item.category);
+    });
+    return ["ALL", ...categorySet];
+  }, [orderItems]);
 
-  const sourceItems = useMemo(
-    () => (mode === "AUTO" ? recommendations : products),
-    [mode, recommendations, products],
-  );
-
-  const draftItems = useMemo(
+  const filteredOrderItems = useMemo(
     () =>
-      sourceItems
-        .map((item) => ({
-          product_id: item.product_id,
-          product_name: item.product_name ?? item.name,
-          quantity: Number(quantities[item.product_id] ?? 0),
-          unit_price: Number(item.price ?? 0),
-        }))
-        .filter((item) => item.quantity > 0),
-    [sourceItems, quantities],
+      selectedCategory === "ALL"
+        ? orderItems
+        : orderItems.filter((item) => item.category === selectedCategory),
+    [orderItems, selectedCategory],
   );
 
-  const totalQuantity = draftItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalAmount = draftItems.reduce(
-    (sum, item) => sum + item.quantity * item.unit_price,
-    0,
+  const totalQuantity = useMemo(
+    () =>
+      filteredOrderItems
+        .filter((item) => Number(item.quantity || 0) > 0)
+        .reduce((sum, item) => sum + Number(item.quantity), 0),
+    [filteredOrderItems],
+  );
+  const totalAmount = useMemo(
+    () =>
+      filteredOrderItems.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.quantity || 0) > 0
+            ? Number(item.quantity) * Number(item.price || 0)
+            : 0),
+        0,
+      ),
+    [filteredOrderItems],
+  );
+  const pendingItemCount = useMemo(
+    () =>
+      filteredOrderItems.filter(
+        (item) => Number(item.quantity || 0) > 0,
+      ).length,
+    [filteredOrderItems],
   );
 
-  const handleQuantityChange = (productId, value) => {
-    setQuantities((prev) => ({ ...prev, [productId]: value }));
-  };
+  const totalPages = Math.ceil(filteredOrderItems.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(totalPages, 1));
+  const paginatedOrderItems = useMemo(
+    () =>
+      filteredOrderItems.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE,
+      ),
+    [currentPage, filteredOrderItems],
+  );
 
-  const validateItems = () => {
-    if (!draftItems.length) {
-      return "발주할 상품이 없습니다. 발주 수량을 1 이상 입력하세요.";
-    }
-    const invalid = draftItems.some(
-      (item) => !Number.isInteger(item.quantity) || item.quantity < 1,
+  const updateQuantity = (productId, value) => {
+    setOrderItems((previous) =>
+      previous.map((item) =>
+        String(item.product_id) === String(productId)
+          ? { ...item, quantity: String(value) }
+          : item,
+      ),
     );
-    if (invalid) {
-      return "발주 수량은 1 이상의 정수로 입력하세요.";
-    }
-    if (draftItems.length > 500) {
-      return "발주 항목은 한 번에 최대 500개까지 등록할 수 있습니다.";
-    }
-    return "";
   };
 
-  const buildRequestItems = () =>
-    draftItems.map((item) => ({
-      product_id: item.product_id,
-      quantity: item.quantity,
-    }));
-
-  const handleCreateDraft = async () => {
-    setFormError("");
-    const validationError = validateItems();
-    if (validationError) {
-      setFormError(validationError);
+  const handleCreate = async () => {
+    setError("");
+    const pendingItems = filteredOrderItems.filter((item) => Number(item.quantity || 0) > 0);
+    const invalid = pendingItems.filter((item) => {
+      const quantity = Number(item.quantity);
+      return !Number.isInteger(quantity) || quantity < 1;
+    });
+    if (!pendingItems.length) {
+      setError("발주할 상품이 없습니다.");
       return;
     }
-    if (
-      !window.confirm(
-        `총 ${draftItems.length}개 상품 / ${totalQuantity.toLocaleString("ko-KR")}개 수량으로 발주 명세서를 생성하시겠습니까?`,
-      )
-    ) {
+    if (invalid.length) {
+      setError("발주 수량은 1 이상의 정수로 입력하세요.");
       return;
     }
+    if (!window.confirm(`총 ${pendingItems.length}개 상품으로 발주 명세서를 생성하시겠습니까?`)) return;
     setCreating(true);
     try {
-      const spec = await createOrderSpec(buildRequestItems());
+      const spec = await createOrderSpec(
+        pendingItems.map((item) => ({
+          product_id: item.product_id,
+          quantity: Number(item.quantity),
+        })),
+      );
       navigate("/store/orders/specs", {
         state: {
-          message: `발주 명세서(${spec.order_number})가 DRAFT 상태로 생성되었습니다. 내용을 확인한 뒤 발주를 확정하세요.`,
+          message: `발주 명세서(${spec.order_number})가 DRAFT 상태로 생성되었습니다.`,
         },
       });
     } catch (err) {
-      setFormError(
-        getApiError(err, "발주 명세서 생성 중 오류가 발생했습니다."),
-      );
+      setError(getApiError(err, "발주 명세서 생성 중 오류가 발생했습니다."));
     } finally {
       setCreating(false);
     }
   };
 
-  const previewSpec = {
-    order_number: "(저장 시 자동 생성)",
-    order_status: "DRAFT",
-    store_name: user?.storeName ?? "-",
-    total_amount: totalAmount,
-    items: draftItems.map((item, index) => ({
-      item_id: index,
-      product_id: item.product_id,
-      product_name: item.product_name,
-      order_quantity: item.quantity,
-      unit_price: item.unit_price,
-      amount: item.quantity * item.unit_price,
-      received_quantity: null,
-    })),
-    status_histories: [],
+  const switchTab = (tabName) => {
+    setActiveTab(tabName);
+    if (tabName === "specs-create") {
+      navigate("/store/orders/specs/new");
+    } else if (tabName === "order-settings") {
+      navigate("/store/order-settings");
+    }
+  };
+
+  // Safety stock 변경 핸들러
+  const handleSafetyStockChange = (productId, event) => {
+    const newSafetyStock = Number(event.target.value);
+    setOrderItems((previous) =>
+      previous.map((item) => {
+        if (String(item.product_id) === String(productId)) {
+          return {
+            ...item,
+            safety_stock: newSafetyStock,
+            recommended_quantity:
+              calculateRecommendedQuantity(
+                Number(item.recent_7d_sales || 0),
+                newSafetyStock,
+                Number(item.current_stock || 0),
+              ),
+            quantity: String(
+              calculateRecommendedQuantity(
+                Number(item.recent_7d_sales || 0),
+                newSafetyStock,
+                Number(item.current_stock || 0),
+              )
+            ),
+          };
+        }
+        return item;
+      }),
+    );
   };
 
   return (
     <>
-      <Header
-        title="발주 명세서 작성"
-        description="자동 추천 또는 상품 직접 선택으로 DRAFT 명세서를 생성합니다."
-      />
-
-      <div className="stats-grid">
-        <StatCard
-          label="상품 수"
-          value={(mode === "AUTO" ? totalCount : products.length).toLocaleString()}
-          icon={ClipboardList}
-          tone="blue"
-        />
-        <StatCard
-          label={`발주 대상 상품 (현재 페이지)`}
-          value={draftItems.length}
-          icon={ShoppingCart}
-          tone="orange"
-        />
-        <StatCard
-          label="총 발주 금액 (현재 페이지)"
-          value={formatAmount(totalAmount)}
-          icon={ShoppingCart}
-          tone="purple"
-        />
-      </div>
-
-      <div className="toolbar">
-        <div className="toolbar-left">
-          <Button
-            type="button"
-            variant={mode === "AUTO" ? "primary" : "secondary"}
-            onClick={() => {
-              setMode("AUTO");
-              setQuantities({});
-              loadRecommendations({ targetPage: 1 });
-            }}
-            disabled={creating}
-          >
-            자동발주
-          </Button>
-          <Button
-            type="button"
-            variant={mode === "MANUAL" ? "primary" : "secondary"}
-            onClick={() => {
-              setMode("MANUAL");
-              loadProducts();
-            }}
-            disabled={creating}
-          >
-            수동발주
-          </Button>
-          {mode === "AUTO" && (
-            <>
-              <SearchInput
-                placeholder="상품명, 카테고리 검색"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onSearch={() => loadRecommendations({ targetPage: 1 })}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                className="btn-sm"
-                onClick={() => loadRecommendations({ targetPage: 1 })}
-                disabled={loading || creating}
-              >
-                조회
-              </Button>
-            </>
-          )}
-        </div>
-        <div className="toolbar-right">
-          <span className="muted" style={{ fontSize: "12px", fontWeight: 600 }}>
-            {draftItems.length}개 상품 / {totalQuantity.toLocaleString("ko-KR")}개
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            className="btn-sm"
-            onClick={() => setPreviewOpen(true)}
-            disabled={loading || creating || !draftItems.length}
-          >
-            <Eye size={16} />
-            미리보기
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="btn-sm"
-            onClick={handleCreateDraft}
-            loading={creating}
-            disabled={loading || creating || !draftItems.length}
-          >
-            명세서 생성
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="btn-sm"
-            onClick={() =>
-              mode === "AUTO"
-                ? loadRecommendations({ targetPage: page })
-                : loadProducts()
-            }
-            disabled={loading || creating}
-          >
-            <RefreshCw size={16} className={loading ? "spin" : ""} />
-            새로고침
-          </Button>
-        </div>
-      </div>
-
-      {formError && (
-        <div className="alert alert-error" style={{ marginBottom: "16px" }}>
-          {formError}
-        </div>
-      )}
-
-      <Card className="table-card">
-        {loading ? (
-          <Loading
-            label={mode === "AUTO" ? "발주 추천을 불러오는 중..." : "상품 목록을 불러오는 중..."}
-          />
-        ) : error ? (
-          <div style={{ padding: "24px" }}>
-            <div className="alert alert-error">{error}</div>
-            <div style={{ marginTop: "12px", textAlign: "center" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => loadRecommendations({ targetPage: page })}
-              >
-                다시 시도
-              </button>
-            </div>
-          </div>
-        ) : sourceItems.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>상품 코드</th>
-                  <th>상품명</th>
-                  <th>카테고리</th>
-                  <th style={{ textAlign: "right" }}>현재 재고</th>
-                  <th style={{ textAlign: "right" }}>추천 발주량</th>
-                  <th style={{ textAlign: "right" }}>단가</th>
-                  <th style={{ textAlign: "center" }}>발주 수량</th>
-                  <th style={{ textAlign: "right" }}>금액</th>
-                  <th style={{ textAlign: "center" }}>데이터 상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sourceItems.map((item) => {
-                  const quantity = Number(quantities[item.product_id] ?? 0);
-                  const hasWarning = item.data_warning?.length > 0;
-                  return (
-                    <tr key={item.product_id}>
-                      <td className="muted" style={{ fontFamily: "monospace" }}>
-                        #{item.product_id}
-                      </td>
-                      <td>
-                        <strong>{item.product_name ?? item.name}</strong>
-                      </td>
-                      <td>
-                        <span
-                          className="badge"
-                          style={{ background: "#f1f5f9", color: "#334155" }}
-                        >
-                          {item.category || "-"}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        {mode === "AUTO"
-                          ? Number(item.current_stock).toLocaleString("ko-KR")
-                          : "-"}
-                      </td>
-                      <td style={{ textAlign: "right", color: item.needs_order ? "#b45309" : "#64748b" }}>
-                        {mode === "AUTO" && item.needs_order
-                          ? Number(item.order_quantity).toLocaleString("ko-KR")
-                          : mode === "AUTO"
-                            ? "발주 불필요"
-                            : "-"}
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        {Number(item.price ?? 0).toLocaleString("ko-KR")}원
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={quantities[item.product_id] ?? ""}
-                          onChange={(event) =>
-                            handleQuantityChange(
-                              item.product_id,
-                              event.target.value.replace(/[^0-9]/g, ""),
-                            )
-                          }
-                          disabled={creating}
-                          style={{
-                            width: "84px",
-                            textAlign: "right",
-                            padding: "7px 9px",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "8px",
-                          }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 600 }}>
-                        {formatAmount(quantity * Number(item.price ?? 0))}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {mode === "AUTO" && hasWarning ? (
-                          <span
-                            className="badge"
-                            style={{ background: "#fef3c7", color: "#b45309" }}
-                            title={item.data_warning
-                              .map((code) => WARNING_LABELS[code] || code)
-                              .join(", ")}
-                          >
-                            <AlertTriangle size={12} /> 데이터 부족
-                          </span>
-                        ) : (
-                          <span className="muted">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState>
-            {mode === "AUTO" && query.trim()
-              ? "검색 결과가 없습니다."
-              : "발주 추천을 계산할 재고 상품이 없습니다."}
-          </EmptyState>
-        )}
-      </Card>
-
-      {!loading && !error && mode === "AUTO" && recommendations.length > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={totalCount}
-          disabled={loading || creating}
-          onChange={(nextPage) => loadRecommendations({ targetPage: nextPage })}
-        />
-      )}
-
-      {previewOpen && (
-        <Modal
-          title="발주 명세서 미리보기"
-          onClose={() => setPreviewOpen(false)}
-          maxWidth="760px"
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: "12px",
-              marginBottom: "14px",
-              fontSize: "13px",
-            }}
-          >
-            <div>
-              <span className="muted" style={{ display: "block" }}>발주 번호</span>
-              <strong style={{ fontFamily: "monospace" }}>
-                (저장 시 자동 생성)
-              </strong>
-            </div>
-            <div>
-              <span className="muted" style={{ display: "block" }}>점포</span>
-              <strong>{user?.storeName ?? "-"}</strong>
-            </div>
-            <div>
-              <span className="muted" style={{ display: "block" }}>상태</span>
-              <SpecStatusBadge status="DRAFT" />
-            </div>
-            <div>
-              <span className="muted" style={{ display: "block" }}>총 발주 금액</span>
-              <strong style={{ fontSize: "15px" }}>{formatAmount(totalAmount)}</strong>
-            </div>
-          </div>
-          <SpecItemsTable
-            items={previewSpec.items}
-            quantityColumnLabel="발주 수량"
-          />
-          <p className="muted" style={{ fontSize: "12px", marginTop: "12px" }}>
-            임시 저장 또는 제출 시점에 상품명·단가가 서버에 스냅샷으로 저장되고
-            발주 번호(OS-YYYYMMDD-XXXXXX)가 자동 생성됩니다.
-          </p>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "10px",
-              marginTop: "14px",
-            }}
-          >
+      {/* 상단 탭 메뉴 */}
+      <Card className="tab-card">
+        <div className="tab-header" style={{ padding: "12px 20px" }}>
+          <div className="tab-btn-group">
             <Button
               type="button"
-              variant="secondary"
-              onClick={() => setPreviewOpen(false)}
-            >
-              닫기
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCreateDraft}
-              loading={creating}
+              variant={activeTab === "specs-create" ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => switchTab("specs-create")}
               disabled={creating}
             >
-              명세서 생성
+              [발주 명세서 작성]
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === "order-settings" ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => switchTab("order-settings")}
+              disabled={creating}
+            >
+              [발주 설정]
             </Button>
           </div>
-        </Modal>
+        </div>
+      </Card>
+
+      {/* 탭별 컨텐츠 - 발주 명세서 작성 */}
+      {activeTab === "specs-create" && (
+        <Card className="table-card">
+          {loading ? (
+            <Loading label="발주 데이터를 불러오는 중..." />
+          ) : (
+            <>
+              <div className="toolbar" style={{ padding: "14px 20px 0", marginBottom: "12px" }}>
+                <div className="toolbar-left">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedCategory("ALL")}
+                    disabled={creating}
+                  >
+                    전체
+                  </Button>
+                </div>
+                <div className="toolbar-right">
+                  {allCategories.map((category) => (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={selectedCategory === category ? "primary" : "secondary"}
+                      size="sm"
+                      className="mx-1"
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setPage(1);
+                      }}
+                      disabled={creating}
+                    >
+                      {category === "ALL" ? "전체" : category}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>카테고리</th>
+                      <th>상품명</th>
+                      <th style={{ textAlign: "right" }}>현재 재고</th>
+                      <th style={{ textAlign: "right" }}>안전 재고</th>
+                      <th style={{ textAlign: "right" }}>최근 7일 판매량</th>
+                      <th style={{ textAlign: "right", fontWeight: 600 }}>추천 발주량</th>
+                      <th style={{ textAlign: "center" }}>발주 수량</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedOrderItems.map((item) => {
+                      return (
+                        <tr key={item.product_id}>
+                          <td>{item.category}</td>
+                          <td><strong>{item.product_name}</strong></td>
+                          <td style={{ textAlign: "right" }}>
+                            {item.current_stock.toLocaleString()}개
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.safety_stock}
+                              onChange={(e) => handleSafetyStockChange(item.product_id, e)}
+                              disabled={creating}
+                              style={{
+                                width: "84px",
+                                textAlign: "right",
+                                padding: "7px 9px",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                              }}
+                            />개
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            {item.recent_7d_sales === null
+                              ? "-"
+                              : `${Number(item.recent_7d_sales).toLocaleString()}개`}
+                          </td>
+                          <td style={{ textAlign: "right", fontWeight: 600 }}>
+                            {item.recommended_quantity.toLocaleString()}개
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={item.quantity}
+                              onChange={(event) => updateQuantity(item.product_id, event.target.value)}
+                              disabled={creating}
+                              style={{
+                                width: "84px",
+                                textAlign: "right",
+                                padding: "7px 9px",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </Card>
       )}
+
+      {!loading &&
+        totalPages > 0 &&
+        activeTab === "specs-create" && (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            total={filteredOrderItems.length}
+            disabled={creating}
+            onChange={setPage}
+          />
+        )}
+
+      <div className="button-row" style={{ justifyContent: "flex-end", marginTop: "16px" }}>
+        <Button
+          type="button"
+          onClick={handleCreate}
+          loading={creating}
+          disabled={creating || filteredOrderItems.length === 0}
+        >
+          통합 발주 명세서 생성
+        </Button>
+      </div>
     </>
   );
 }

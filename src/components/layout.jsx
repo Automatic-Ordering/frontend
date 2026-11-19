@@ -10,8 +10,6 @@ import {
   PackageCheck,
   Receipt,
   Settings,
-  ShoppingCart,
-  SlidersHorizontal,
   Store,
   X,
 } from "lucide-react";
@@ -34,8 +32,6 @@ export function Sidebar({ admin = false }) {
         ["/store/inventory", "재고 관리", Boxes],
         ["/store/sales", "판매 내역", Receipt],
         ["/store/sales/new", "판매 등록", Receipt],
-        ["/store/orders/recommendations", "자동 발주", ShoppingCart],
-        ["/store/order-settings", "발주 기준 설정", SlidersHorizontal],
         ["/store/orders/specs/new", "명세서 작성", FilePlus2],
         ["/store/orders/specs", "발주 내역", ClipboardList],
         ["/store/orders/receipts", "입고 관리", PackageCheck],

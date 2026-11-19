@@ -11,14 +11,13 @@ import StoreDashboard from "../pages/store/StoreDashboard";
 import StoreInventory from "../pages/store/StoreInventory";
 import StoreSales from "../pages/store/StoreSales";
 import StoreSaleCreate from "../pages/store/StoreSaleCreate";
-import StoreOrderRecommendations from "../pages/store/StoreOrderRecommendations";
 import StoreOrderSpecCreate from "../pages/store/StoreOrderSpecCreate";
 import StoreOrderSpecList from "../pages/store/StoreOrderSpecList";
 import StoreReceipts from "../pages/store/StoreReceipts";
-import StoreOrderSettings from "../pages/store/StoreOrderSettings";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminRoute from "./AdminRoute";
 import StoreSettings from "../pages/store/StoreSettings";
+import StoreOrderSettings from "../pages/store/StoreOrderSettings";
 export default function AppRouter() {
   return (
     <Routes>
@@ -41,7 +40,7 @@ export default function AppRouter() {
           <Route path="/store/sales/new" element={<StoreSaleCreate />} />
           <Route
             path="/store/orders/recommendations"
-            element={<StoreOrderRecommendations />}
+            element={<Navigate to="/store/orders/specs/new" replace />}
           />
           <Route
             path="/store/orders/specs/new"
@@ -53,7 +52,7 @@ export default function AppRouter() {
             path="/store/orders"
             element={<Navigate to="/store/orders/specs" replace />}
           />
-          <Route path="/store/order-settings" element={<StoreOrderSettings />} />
+<Route path="/store/order-settings" element={<StoreOrderSettings />} />
           <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>
