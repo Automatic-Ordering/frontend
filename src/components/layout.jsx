@@ -21,7 +21,7 @@ const STORE_LINKS = [
   ["/store/inventory", "재고 관리", Boxes],
   ["/store/sales", "판매 내역", Receipt],
   ["/store/sales/new", "판매 등록", Receipt],
-  ["/store/orders/specs/new", "명세서 작성", FilePlus2],
+  ["/store/orders/specs/new", "발주 관리", FilePlus2],
   ["/store/orders/specs", "발주 내역", ClipboardList],
   ["/store/orders/receipts", "입고 관리", PackageCheck],
   ["/store/orders/settings", "발주 설정", Settings],
@@ -32,9 +32,6 @@ const ADMIN_LINKS = [
   ["/admin", "대시보드", LayoutDashboard],
   ["/admin/stores", "점포 관리", Store],
   ["/admin/products", "상품 관리", Package],
-  ["/admin/orders/specs", "발주 명세서 관리", FilePlus2],
-  ["/admin/orders", "승인 내역", Receipt],
-  ["/admin/settings", "시스템 설정", Settings],
 ];
 
 export function Sidebar({ admin = false }) {
