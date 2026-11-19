@@ -58,10 +58,7 @@ export function Sidebar({ admin = false }) {
       <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">A</div>
-          <div>
-            <strong>AutoOrder</strong>
-            <small>{admin ? "관리자 센터" : "점포 운영"}</small>
-          </div>
+          <strong>AutoOrder</strong>
           <button className="sidebar-close" onClick={() => setOpen(false)}>
             <X size={18} />
           </button>

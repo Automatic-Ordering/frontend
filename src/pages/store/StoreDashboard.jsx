@@ -80,12 +80,12 @@ export default function StoreDashboard() {
 
       <Card className="welcome-card" style={{ marginBottom: "20px" }}>
         <div>
-          <span className="eyebrow">STORE OPERATIONS</span>
-          <h2>자동발주 시스템 운영 현황</h2>
-          <p>
-            매출 추이와 재고 부족·발주 권장 품목을 확인하고 바로 발주 명세서를
-            작성할 수 있습니다.
-          </p>
+<span className="eyebrow">STORE OPERATIONS</span>
+    <h2>AutoOrder — 편의점 스마트 자동발주 시스템</h2>
+    <p>
+      매출 추이와 재고 부족·발주 권장 품목을 확인하고 바로 발주 명세서를
+      작성할 수 있습니다.
+    </p>
         </div>
         <Sparkles size={70} />
       </Card>

@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   return (
     <>
       <Header
-        title="대시보드"
+        title="AutoOrder"
         description="전체 점포 운영 현황을 한눈에 확인하세요."
       />
       {loading ? (
