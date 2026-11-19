@@ -38,21 +38,14 @@ export default function AppRouter() {
           <Route path="/store/inventory" element={<StoreInventory />} />
           <Route path="/store/sales" element={<StoreSales />} />
           <Route path="/store/sales/new" element={<StoreSaleCreate />} />
-          <Route
-            path="/store/orders/recommendations"
+          <Route path="/store/orders/recommendations"
             element={<Navigate to="/store/orders/specs/new" replace />}
           />
-          <Route
-            path="/store/orders/specs/new"
-            element={<StoreOrderSpecCreate />}
-          />
+          <Route path="/store/orders/specs/new" element={<StoreOrderSpecCreate />} />
           <Route path="/store/orders/specs" element={<StoreOrderSpecList />} />
           <Route path="/store/orders/receipts" element={<StoreReceipts />} />
-          <Route
-            path="/store/orders"
-            element={<Navigate to="/store/orders/specs" replace />}
-          />
-<Route path="/store/order-settings" element={<StoreOrderSettings />} />
+          <Route path="/store/orders/settings" element={<StoreOrderSettings />} />
+          <Route path="/store/orders" element={<Navigate to="/store/orders/specs" replace />} />
           <Route path="/store/settings" element={<StoreSettings />} />
         </Route>
       </Route>

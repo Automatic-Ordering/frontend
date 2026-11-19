@@ -1,74 +1,225 @@
-import { useEffect, useState } from "react";
-import { Button, Card, Input, Loading } from "../../components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Card, Loading } from "../../components/ui";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
-import { getOrderSettings, updateOrderSettings } from "../../services/orderService";
-import { getStoreProducts } from "../../services/productService";
+import {
+  getStoreProducts,
+  patchProductSafetyStock,
+} from "../../services/productService";
+import { getRecommendations } from "../../services/orderService";
 
-const FIELDS = [
-  ["analysis_days", "판매 분석 기간 (일)", 1],
-  ["safety_stock_days", "안전재고 일수", 0],
-  ["lead_time_days", "리드타임 (일)", 0],
-];
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeInteger = (value) =>
+  Math.max(0, Math.floor(Number(value) || 0));
+
+const fetchAllRecommendations = async () => {
+  const firstPage = await getRecommendations({ page: 1, limit: 100 });
+  const totalPages = Number(firstPage.total_pages ?? 1);
+  const remainingPages =
+    totalPages > 1
+      ? await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, index) =>
+            getRecommendations({ page: index + 2, limit: 100 }),
+          ),
+        )
+      : [];
+  return [
+    ...(firstPage.items ?? []),
+    ...remainingPages.flatMap((page) => page.items ?? []),
+  ];
+};
 
 export default function StoreOrderSettings() {
-  const [form, setForm] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [bulkSafetyStock, setBulkSafetyStock] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const loadProducts = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const [productData, recommendationData] = await Promise.all([
+        getStoreProducts(),
+        fetchAllRecommendations(),
+      ]);
+
+      const recommendationsById = new Map(
+        recommendationData.map((item) => [
+          String(item.product_id),
+          item,
+        ]),
+      );
+
+      setProducts(
+        (productData ?? [])
+          .filter((item) => item.is_registered)
+          .map((product) => {
+            const recommendation =
+              recommendationsById.get(String(product.product_id)) ?? {};
+            return {
+              product_id: product.product_id,
+              category: recommendation.category ?? product.category ?? "미분류",
+              product_name:
+                recommendation.product_name ?? product.product_name,
+              current_stock: toNumber(
+                recommendation.current_stock ?? product.current_stock,
+              ),
+              safety_stock: toNumber(
+                recommendation.safety_stock ?? product.safety_stock,
+              ),
+              recent_7d_sales: toNumber(
+                recommendation.recent_7d_sales ??
+                  recommendation.recent_sales_quantity ??
+                  recommendation.recent_sales ??
+                  recommendation.weekly_sales_quantity,
+              ),
+            };
+          }),
+      );
+    } catch (loadError) {
+      setError(
+        getApiError(loadError, "발주 설정 데이터를 불러오지 못했습니다."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
-    const loadInitialData = async () => {
-      const [settings, _products] = await Promise.all([
-        getOrderSettings(),
-        getStoreProducts(),
-      ]);
 
-      if (!cancelled) {
-        setForm({
-          analysis_days: String(settings.analysis_days ?? 7),
-          safety_stock_days: String(settings.safety_stock_days ?? 2),
-          lead_time_days: String(settings.lead_time_days ?? 1),
-        });
+    const loadOnce = async () => {
+      try {
+        const [productData, recommendationData] = await Promise.all([
+          getStoreProducts(),
+          fetchAllRecommendations(),
+        ]);
+
+        if (cancelled) return;
+
+        const recommendationsById = new Map(
+          recommendationData.map((item) => [
+            String(item.product_id),
+            item,
+          ]),
+        );
+
+        setProducts(
+          (productData ?? [])
+            .filter((item) => item.is_registered)
+            .map((product) => {
+              const recommendation =
+                recommendationsById.get(String(product.product_id)) ?? {};
+              return {
+                product_id: product.product_id,
+                category:
+                  recommendation.category ?? product.category ?? "미분류",
+                product_name:
+                  recommendation.product_name ?? product.product_name,
+                current_stock: toNumber(
+                  recommendation.current_stock ?? product.current_stock,
+                ),
+                safety_stock: toNumber(
+                  recommendation.safety_stock ?? product.safety_stock,
+                ),
+                recent_7d_sales: toNumber(
+                  recommendation.recent_7d_sales ??
+                    recommendation.recent_sales_quantity ??
+                    recommendation.recent_sales ??
+                    recommendation.weekly_sales_quantity,
+                ),
+              };
+            }),
+        );
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            getApiError(loadError, "발주 설정 데이터를 불러오지 못했습니다."),
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      loadInitialData()
-        .catch((err) => {
-          if (cancelled) return;
-          setError(getApiError(err, "설정을 불러오지 못했습니다."));
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
     };
 
-    loadInitialData();
+    loadOnce();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const submit = async (event) => {
-    event.preventDefault();
+  const categories = useMemo(
+    () => [
+      "ALL",
+      ...Array.from(
+        new Set(
+          products
+            .map((item) => item.category)
+            .filter((category) => category && category !== "미분류"),
+        ),
+      ),
+    ],
+    [products],
+  );
+
+  const filteredProducts = useMemo(
+    () =>
+      selectedCategory === "ALL"
+        ? products
+        : products.filter((item) => item.category === selectedCategory),
+    [products, selectedCategory],
+  );
+
+  const applyBulkSafetyStock = () => {
+    const normalizedValue = normalizeInteger(bulkSafetyStock);
+    setBulkSafetyStock(normalizedValue);
+    setProducts((previous) =>
+      previous.map((product) =>
+        selectedCategory === "ALL" ||
+        product.category === selectedCategory
+          ? { ...product, safety_stock: normalizedValue }
+          : product,
+      ),
+    );
+  };
+
+  const updateSafetyStock = (productId, value) => {
+    const normalizedValue = normalizeInteger(value);
+    setProducts((previous) =>
+      previous.map((product) =>
+        String(product.product_id) === String(productId)
+          ? { ...product, safety_stock: normalizedValue }
+          : product,
+      ),
+    );
+  };
+
+  const saveSafetyStocks = async () => {
     setError("");
     setMessage("");
-    const payload = {};
-    for (const [key, , min] of FIELDS) {
-      const value = Number(form[key]);
-      if (!Number.isInteger(value) || value < min) {
-        setError("판매 분석 기간은 1 이상, 안전재고·리드타임은 0 이상의 정수여야 합니다.");
-        return;
-      }
-      payload[key] = value;
-    }
     setSaving(true);
     try {
-      await updateOrderSettings(payload);
-      setMessage("발주 기준 설정이 저장되었습니다.");
-    } catch (err) {
-      setError(getApiError(err, "설정 저장에 실패했습니다."));
+      await Promise.all(
+        products.map((product) =>
+          patchProductSafetyStock(
+            product.product_id,
+            normalizeInteger(product.safety_stock),
+          ),
+        ),
+      );
+      setMessage("안전 재고가 저장되었습니다.");
+      await loadProducts();
+    } catch (saveError) {
+      setError(getApiError(saveError, "안전 재고 저장에 실패했습니다."));
     } finally {
       setSaving(false);
     }
@@ -76,42 +227,166 @@ export default function StoreOrderSettings() {
 
   return (
     <>
-      <Header title="발주 설정" description="자동 발주 추천 계산에 사용할 점포 기준을 관리합니다." />
-      {loading ? (
-        <Loading label="설정을 불러오는 중..." />
-      ) : (
-        <Card className="form-card">
-          <form onSubmit={submit}>
-            <div className="form-section">
-              <h3>기준 설정</h3>
-              {FIELDS.map(([key, label, min]) => (
-                <div key={key} style={{ marginBottom: "16px" }}>
-                  <label className="field-label" style={{ display: "block", marginBottom: "4px" }}>
-                    {label}
-                  </label>
-                  <Input
-                    type="number"
-                    min={String(min)}
-                    step="1"
-                    value={form[key]}
-                    onChange={(event) =>
-                      setForm((previous) => ({ ...previous, [key]: event.target.value }))
-                    }
-                  />
-                </div>
+      <Header
+        title="발주 설정"
+        description="상품별 안전 재고 수량을 관리합니다."
+      />
+
+      {error && (
+        <div className="alert alert-error" style={{ marginBottom: "16px" }}>
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="alert alert-success" style={{ marginBottom: "16px" }}>
+          {message}
+        </div>
+      )}
+
+      <Card className="form-card" style={{ maxWidth: "100%", marginBottom: "16px" }}>
+        <div
+          className="toolbar"
+          style={{ margin: 0, alignItems: "flex-end" }}
+        >
+          <div className="toolbar-left" style={{ alignItems: "center" }}>
+            <select
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value)}
+              style={{
+                height: "40px",
+                minWidth: "180px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "0 10px",
+              }}
+            >
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category === "ALL" ? "전체" : category}
+                </option>
               ))}
-              {error && <div className="alert alert-error">{error}</div>}
-              {message && <div className="alert alert-success">{message}</div>}
+            </select>
+            <input
+              type="number"
+              min="0"
+              value={bulkSafetyStock}
+              onChange={(event) =>
+                setBulkSafetyStock(
+                  normalizeInteger(event.target.value),
+                )
+              }
+              style={{
+                width: "110px",
+                height: "40px",
+                textAlign: "right",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "0 10px",
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={applyBulkSafetyStock}
+              disabled={loading || saving}
+            >
+              카테고리 일괄 적용
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="table-card">
+        {loading ? (
+          <Loading label="발주 설정 데이터를 불러오는 중..." />
+        ) : (
+          <>
+            <div
+              className="toolbar"
+              style={{ padding: "14px 20px 0", marginBottom: "12px" }}
+            >
+              <div className="toolbar-left" style={{ alignItems: "center" }}>
+                {categories.map((category) => (
+                  <Button
+                    key={category}
+                    type="button"
+                    variant={selectedCategory === category ? "primary" : "secondary"}
+                    className="btn-sm"
+                    onClick={() => setSelectedCategory(category)}
+                    disabled={saving}
+                  >
+                    {category === "ALL" ? "전체" : category}
+                  </Button>
+                ))}
+              </div>
             </div>
 
-            <div className="button-row">
-              <Button type="submit" loading={saving}>
-                설정 저장
-              </Button>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>카테고리</th>
+                    <th>상품명</th>
+                    <th style={{ textAlign: "right" }}>현재 재고</th>
+                    <th style={{ textAlign: "right" }}>최근 7일 판매량</th>
+                    <th style={{ textAlign: "right" }}>안전 재고</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => (
+                    <tr key={product.product_id}>
+                      <td>{product.category}</td>
+                      <td><strong>{product.product_name}</strong></td>
+                      <td style={{ textAlign: "right" }}>
+                        {product.current_stock.toLocaleString()}개
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {product.recent_7d_sales.toLocaleString()}개
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={product.safety_stock}
+                          onChange={(event) =>
+                            updateSafetyStock(
+                              product.product_id,
+                              event.target.value,
+                            )
+                          }
+                          disabled={saving}
+                          style={{
+                            width: "84px",
+                            textAlign: "right",
+                            padding: "7px 9px",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </form>
-        </Card>
-      )}
+          </>
+        )}
+      </Card>
+
+      <div
+        className="button-row"
+        style={{ justifyContent: "flex-end", marginTop: "16px" }}
+      >
+        <Button
+          type="button"
+          onClick={saveSafetyStocks}
+          loading={saving}
+          disabled={loading || saving || !products.length}
+        >
+          안전 재고 저장
+        </Button>
+      </div>
     </>
   );
 }

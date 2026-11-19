@@ -46,5 +46,5 @@ export const getStoreProductsPage = async ({ page, limit, search } = {}) => {
  * PATCH /api/store/products/:productId/safety_stock  body: { safety_stock }
  */
 export const patchProductSafetyStock = async (productId, safetyStock) => {
-  return unwrap(await api.patch(`/api/store/products/${productId}/safety_stock`, { safety_stock: safetyStock }));
+  return unwrap(await api.patch(`/store/products/${productId}/safety_stock`, { safety_stock: safetyStock }));
 };

@@ -40,7 +40,16 @@ export const getOrderSpecDetail = async (specId) => {
  * items 생략 시 자동 발주 추천(needs_order) 결과가 사용됩니다.
  */
 export const createOrderSpec = async (items) => {
-  const body = items ? { items } : {};
+  const normalizedItems = Array.isArray(items)
+    ? items.map((item) => ({
+        product_id: Number(item.product_id),
+        quantity: Math.max(
+          0,
+          Math.floor(Number(item.quantity) || 0),
+        ),
+      }))
+    : null;
+  const body = normalizedItems?.length ? { items: normalizedItems } : {};
   return unwrap(await api.post("/store/orders/specs", body));
 };
 

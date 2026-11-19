@@ -34,6 +34,7 @@ export function Sidebar({ admin = false }) {
         ["/store/sales/new", "판매 등록", Receipt],
         ["/store/orders/specs/new", "명세서 작성", FilePlus2],
         ["/store/orders/specs", "발주 내역", ClipboardList],
+        ["/store/orders/settings", "발주 설정", Settings],
         ["/store/orders/receipts", "입고 관리", PackageCheck],
         ["/store/settings", "점포 설정", Settings],
       ];
