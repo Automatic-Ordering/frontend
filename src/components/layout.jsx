@@ -23,8 +23,8 @@ const STORE_LINKS = [
   ["/store/sales/new", "판매 등록", Receipt],
   ["/store/orders/specs/new", "발주 관리", FilePlus2],
   ["/store/orders/specs", "발주 내역", ClipboardList],
-  ["/store/orders/receipts", "입고 관리", PackageCheck],
   ["/store/orders/settings", "발주 설정", Settings],
+  ["/store/orders/receipts", "입고 관리", PackageCheck],
   ["/store/settings", "점포 설정", Settings],
 ];
 
