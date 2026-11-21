@@ -31,11 +31,9 @@ import {
 } from "../../services/productService";
 
 const INITIAL_FORM = {
-  product_code: "",
   product_name: "",
   category: "",
   price: "",
-  is_active: true,
 };
 
 export default function ProductList() {
@@ -54,11 +52,9 @@ export default function ProductList() {
   const [editingProductId, setEditingProductId] = useState(null);
   const [categories, setCategories] = useState([]);
 
-  // 어떤 행의 '...' 메뉴가 열려 있는지 관리
   const [openMenuId, setOpenMenuId] = useState(null);
   const menuRef = useRef(null);
 
-  // 메뉴 바깥 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -101,7 +97,7 @@ export default function ProductList() {
         selectedCategory === "ALL" || p.category === selectedCategory;
       const matchesQuery =
         !query.trim() ||
-        `${p.product_name || ""} ${p.product_code || ""} ${p.category || ""} ${p.product_id || ""}`
+        `${p.product_name || ""} ${p.category || ""} #${p.product_id || ""}`
           .toLowerCase()
           .includes(query.trim().toLowerCase());
       return matchesCategory && matchesQuery;
@@ -182,11 +178,9 @@ export default function ProductList() {
     setModalType("update");
     setEditingProductId(id);
     setFormData({
-      product_code: product.product_code || String(id),
       product_name: product.product_name || "",
       category: product.category || "",
       price: String(product.price ?? ""),
-      is_active: product.is_active ?? true,
     });
     setModalOpen(true);
 
@@ -195,11 +189,9 @@ export default function ProductList() {
       const detail = res?.product || res;
       if (detail) {
         setFormData({
-          product_code: detail.product_code || String(detail.product_id ?? id),
           product_name: detail.product_name || "",
           category: detail.category || "",
           price: String(detail.price ?? ""),
-          is_active: detail.is_active ?? true,
         });
       }
     } catch (err) {
@@ -224,11 +216,9 @@ export default function ProductList() {
     setSubmitting(true);
     try {
       const payload = {
-        product_code: formData.product_code.trim() || undefined,
         product_name: formData.product_name.trim(),
         category: formData.category,
         price: Number(formData.price),
-        is_active: Boolean(formData.is_active),
       };
 
       if (modalType === "create") {
@@ -285,7 +275,7 @@ export default function ProductList() {
           <div className="search-box">
             <Search size={18} />
             <input
-              placeholder="상품명, 상품 코드, 카테고리 검색"
+              placeholder="상품명, 상품 코드(#번호), 카테고리 검색"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -364,7 +354,7 @@ export default function ProductList() {
                           className="muted"
                           style={{ fontFamily: "monospace" }}
                         >
-                          {product.product_code || `#${product.product_id}`}
+                          #{product.product_id}
                         </td>
                         <td>
                           <strong>{product.product_name}</strong>
@@ -386,15 +376,7 @@ export default function ProductList() {
                           {Number(product.price).toLocaleString()}원
                         </td>
                         <td style={{ textAlign: "center" }}>
-                          <Badge
-                            status={
-                              product.is_active === false
-                                ? "inactive"
-                                : "active"
-                            }
-                          >
-                            {product.is_active === false ? "중지" : "정상"}
-                          </Badge>
+                          <Badge status="active">정상</Badge>
                         </td>
                         <td className="muted">
                           {product.created_at
@@ -642,25 +624,24 @@ export default function ProductList() {
       {/* 상품 등록/수정 모달 */}
       {modalOpen && (
         <Modal
-          title={modalType === "create" ? "상품 등록" : "상품 수정"}
+          title={
+            modalType === "create"
+              ? "상품 등록"
+              : `상품 수정 (#${editingProductId})`
+          }
           onClose={handleModalClose}
         >
           <form
             onSubmit={handleModalSubmit}
             style={{ display: "flex", flexDirection: "column", gap: "14px" }}
           >
-            <Input
-              label="상품 코드"
-              placeholder="예: P0001"
-              value={formData.product_code}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  product_code: e.target.value,
-                })
-              }
-              disabled={modalType === "update"}
-            />
+            {modalType === "update" && (
+              <Input
+                label="상품 코드 (자동 부여)"
+                value={`#${editingProductId}`}
+                disabled
+              />
+            )}
             <Input
               label="상품명"
               placeholder="예: 참치마요 삼각김밥"
@@ -707,23 +688,6 @@ export default function ProductList() {
               }
               required
             />
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={formData.is_active}
-                onChange={(e) =>
-                  setFormData({ ...formData, is_active: e.target.checked })
-                }
-              />
-              <span>판매 활성화</span>
-            </label>
             <div
               style={{
                 display: "flex",
