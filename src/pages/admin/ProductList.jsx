@@ -1,26 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  MoreHorizontal,
   Package,
-  RefreshCw,
+  Pencil,
   Search,
+  Trash2,
 } from "lucide-react";
 import {
   Badge,
+  Button,
   Card,
   EmptyState,
+  Input,
   Loading,
+  Modal,
   StatCard,
 } from "../../components/ui";
 import { Header } from "../../components/layout";
 import { getApiError } from "../../services/api";
-import { getProducts } from "../../services/productService";
+import {
+  getProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+} from "../../services/productService";
+
+const INITIAL_FORM = {
+  product_code: "",
+  product_name: "",
+  category: "",
+  price: "",
+  is_active: true,
+};
 
 export default function ProductList() {
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -28,11 +48,40 @@ export default function ProductList() {
   const [pageSize, setPageSize] = useState(10);
 
   const [products, setProducts] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState("create");
+  const [formData, setFormData] = useState(INITIAL_FORM);
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [categories, setCategories] = useState([]);
+
+  // 어떤 행의 '...' 메뉴가 열려 있는지 관리
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
+
+  // 메뉴 바깥 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const loadProducts = () => {
     setLoading(true);
     setError("");
     getProducts()
-      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : data?.products || [];
+        setProducts(arr);
+        const catSet = new Set();
+        arr.forEach((p) => {
+          if (p.category) catSet.add(p.category);
+        });
+        setCategories(Array.from(catSet));
+      })
       .catch((err) =>
         setError(
           getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."),
@@ -42,24 +91,8 @@ export default function ProductList() {
   };
 
   useEffect(() => {
-    getProducts()
-      .then((data) => setProducts(Array.isArray(data) ? data : []))
-      .catch((err) =>
-        setError(
-          getApiError(err, "상품 목록을 불러오는 중 오류가 발생했습니다."),
-        ),
-      )
-      .finally(() => setLoading(false));
+    loadProducts();
   }, []);
-
-  // 전체 카테고리 목록 추출
-  const categories = useMemo(() => {
-    const set = new Set();
-    products.forEach((p) => {
-      if (p.category) set.add(p.category);
-    });
-    return Array.from(set);
-  }, [products]);
 
   // 검색어 및 카테고리 필터링
   const filtered = useMemo(() => {
@@ -68,24 +101,22 @@ export default function ProductList() {
         selectedCategory === "ALL" || p.category === selectedCategory;
       const matchesQuery =
         !query.trim() ||
-        `${p.product_name || ""} ${p.category || ""} ${p.product_id || ""}`
+        `${p.product_name || ""} ${p.product_code || ""} ${p.category || ""} ${p.product_id || ""}`
           .toLowerCase()
           .includes(query.trim().toLowerCase());
       return matchesCategory && matchesQuery;
     });
   }, [products, query, selectedCategory]);
 
-  // 필터(검색어, 카테고리) 변경 시 현재 페이지 1로 동기화 (React 권장 렌더링 중 상태 조정 패턴)
+  // 필터 변경 시 현재 페이지 1로 동기화
   const [prevFilter, setPrevFilter] = useState({ query: "", category: "ALL" });
   if (prevFilter.query !== query || prevFilter.category !== selectedCategory) {
     setPrevFilter({ query, category: selectedCategory });
     setCurrentPage(1);
   }
 
-  // 전체 페이지 수 계산 (상품이 없어도 최소 1페이지 보장)
+  // 전체 페이지 수 계산
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  // 상품 데이터 갱신/필터링으로 현재 페이지가 범위를 벗어나면 유효한 페이지로 즉시 보정
   if (currentPage > totalPages && totalPages > 0) {
     setCurrentPage(totalPages);
   }
@@ -96,13 +127,12 @@ export default function ProductList() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
 
-  // 페이지 사이즈 변경 핸들러
   const handlePageSizeChange = (newSize) => {
     setPageSize(newSize);
     setCurrentPage(1);
   };
 
-  // 페이지 번호 목록 생성 (생략 기호 ... 처리)
+  // 페이지 번호 목록 생성
   const pageNumbers = useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -132,16 +162,105 @@ export default function ProductList() {
     ];
   }, [currentPage, totalPages]);
 
-  // 현재 표시 중인 상품 범위 계산
   const totalCount = filtered.length;
   const startCount = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endCount = Math.min(currentPage * pageSize, totalCount);
+
+  // 신규 등록 모달 열기
+  const handleOpenCreate = () => {
+    setOpenMenuId(null);
+    setModalType("create");
+    setEditingProductId(null);
+    setFormData(INITIAL_FORM);
+    setModalOpen(true);
+  };
+
+  // 수정 모달 열기
+  const handleOpenEdit = async (product) => {
+    const id = product.product_id;
+    setOpenMenuId(null);
+    setModalType("update");
+    setEditingProductId(id);
+    setFormData({
+      product_code: product.product_code || String(id),
+      product_name: product.product_name || "",
+      category: product.category || "",
+      price: String(product.price ?? ""),
+      is_active: product.is_active ?? true,
+    });
+    setModalOpen(true);
+
+    try {
+      const res = await getProductById(id);
+      const detail = res?.product || res;
+      if (detail) {
+        setFormData({
+          product_code: detail.product_code || String(detail.product_id ?? id),
+          product_name: detail.product_name || "",
+          category: detail.category || "",
+          price: String(detail.price ?? ""),
+          is_active: detail.is_active ?? true,
+        });
+      }
+    } catch (err) {
+      alert(getApiError(err, "상품 상세 정보를 불러오지 못했습니다."));
+    }
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setModalType("create");
+    setFormData(INITIAL_FORM);
+    setEditingProductId(null);
+  };
+
+  const handleModalSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.category) {
+      alert("카테고리를 선택해주세요.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        product_code: formData.product_code.trim() || undefined,
+        product_name: formData.product_name.trim(),
+        category: formData.category,
+        price: Number(formData.price),
+        is_active: Boolean(formData.is_active),
+      };
+
+      if (modalType === "create") {
+        await createProduct(payload);
+      } else {
+        await updateProduct(editingProductId, payload);
+      }
+      handleModalClose();
+      loadProducts();
+    } catch (err) {
+      alert(getApiError(err, "상품 저장에 실패했습니다."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (productId) => {
+    setOpenMenuId(null);
+    if (!window.confirm("정말로 이 상품을 삭제하나요?")) return;
+    try {
+      await deleteProduct(productId);
+      loadProducts();
+    } catch (err) {
+      alert(getApiError(err, "상품 삭제에 실패했습니다."));
+    }
+  };
 
   return (
     <>
       <Header
         title="상품 관리"
-        description="본사 공용 상품 카탈로그 및 등록된 상품 목록을 조회합니다."
+        description="본사 공용 상품 카탈로그 및 등록된 상품 목록을 관리합니다."
       />
 
       <div className="stats-grid">
@@ -185,18 +304,24 @@ export default function ProductList() {
               ))}
             </select>
           </div>
-        </div>
 
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={loadProducts}
-          disabled={loading}
-          title="새로고침"
-        >
-          <RefreshCw size={16} className={loading ? "spin" : ""} />
-          새로고침
-        </button>
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              alignItems: "center",
+              marginLeft: "auto",
+            }}
+          >
+            <Button
+              variant="primary"
+              onClick={handleOpenCreate}
+              disabled={loading}
+            >
+              + 상품 등록
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card className="table-card">
@@ -217,7 +342,7 @@ export default function ProductList() {
           </div>
         ) : filtered.length ? (
           <>
-            <div className="table-wrap">
+            <div className="table-wrap" style={{ overflow: "visible" }}>
               <table>
                 <thead>
                   <tr>
@@ -227,41 +352,183 @@ export default function ProductList() {
                     <th style={{ textAlign: "right" }}>판매 가격</th>
                     <th style={{ textAlign: "center" }}>상품 상태</th>
                     <th>등록일자</th>
+                    <th style={{ width: "64px", textAlign: "center" }}>관리</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedProducts.map((product) => (
-                    <tr key={product.product_id}>
-                      <td className="muted" style={{ fontFamily: "monospace" }}>
-                        #{product.product_id}
-                      </td>
-                      <td>
-                        <strong>{product.product_name}</strong>
-                      </td>
-                      <td>
-                        <span
-                          className="badge"
-                          style={{ background: "#f1f5f9", color: "#334155" }}
+                  {paginatedProducts.map((product) => {
+                    const isMenuOpen = openMenuId === product.product_id;
+                    return (
+                      <tr key={product.product_id}>
+                        <td
+                          className="muted"
+                          style={{ fontFamily: "monospace" }}
                         >
-                          {product.category}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 600 }}>
-                        {Number(product.price).toLocaleString()}원
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {/* 실제 DB products 테이블에는 status 컬럼이 없으므로 기본 활성 상태 표기 */}
-                        <Badge status="active">정상</Badge>
-                      </td>
-                      <td className="muted">
-                        {product.created_at
-                          ? new Date(product.created_at).toLocaleDateString(
-                              "ko-KR",
-                            )
-                          : "-"}
-                      </td>
-                    </tr>
-                  ))}
+                          {product.product_code || `#${product.product_id}`}
+                        </td>
+                        <td>
+                          <strong>{product.product_name}</strong>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              background: "#f1f5f9",
+                              color: "#334155",
+                              padding: "2px 8px",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                            }}
+                          >
+                            {product.category}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>
+                          {Number(product.price).toLocaleString()}원
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <Badge
+                            status={
+                              product.is_active === false
+                                ? "inactive"
+                                : "active"
+                            }
+                          >
+                            {product.is_active === false ? "중지" : "정상"}
+                          </Badge>
+                        </td>
+                        <td className="muted">
+                          {product.created_at
+                            ? new Date(product.created_at).toLocaleDateString(
+                                "ko-KR",
+                              )
+                            : "-"}
+                        </td>
+                        <td
+                          style={{
+                            textAlign: "center",
+                            position: "relative",
+                          }}
+                        >
+                          <div
+                            ref={isMenuOpen ? menuRef : null}
+                            style={{
+                              position: "relative",
+                              display: "inline-block",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenMenuId(
+                                  isMenuOpen ? null : product.product_id,
+                                )
+                              }
+                              aria-label="상품 관리 메뉴"
+                              title="관리"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                border: "1px solid transparent",
+                                background: isMenuOpen
+                                  ? "#f1f5f9"
+                                  : "transparent",
+                                color: "#475569",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <MoreHorizontal size={18} />
+                            </button>
+
+                            {isMenuOpen && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  right: 0,
+                                  top: "calc(100% + 4px)",
+                                  minWidth: "120px",
+                                  background: "#ffffff",
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: "10px",
+                                  boxShadow:
+                                    "0 10px 15px -3px rgba(15, 23, 42, 0.12), 0 4px 6px -4px rgba(15, 23, 42, 0.08)",
+                                  padding: "4px",
+                                  zIndex: 30,
+                                  textAlign: "left",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(product)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    width: "100%",
+                                    padding: "8px 10px",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    background: "transparent",
+                                    color: "#1e293b",
+                                    fontSize: "13px",
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  onMouseEnter={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "#f8fafc")
+                                  }
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "transparent")
+                                  }
+                                >
+                                  <Pencil size={14} />
+                                  <span>수정</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDelete(product.product_id)
+                                  }
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    width: "100%",
+                                    padding: "8px 10px",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    background: "transparent",
+                                    color: "#dc2626",
+                                    fontSize: "13px",
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  onMouseEnter={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "#fef2f2")
+                                  }
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "transparent")
+                                  }
+                                >
+                                  <Trash2 size={14} />
+                                  <span>삭제</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -371,6 +638,119 @@ export default function ProductList() {
           </EmptyState>
         )}
       </Card>
+
+      {/* 상품 등록/수정 모달 */}
+      {modalOpen && (
+        <Modal
+          title={modalType === "create" ? "상품 등록" : "상품 수정"}
+          onClose={handleModalClose}
+        >
+          <form
+            onSubmit={handleModalSubmit}
+            style={{ display: "flex", flexDirection: "column", gap: "14px" }}
+          >
+            <Input
+              label="상품 코드"
+              placeholder="예: P0001"
+              value={formData.product_code}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  product_code: e.target.value,
+                })
+              }
+              disabled={modalType === "update"}
+            />
+            <Input
+              label="상품명"
+              placeholder="예: 참치마요 삼각김밥"
+              value={formData.product_name}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  product_name: e.target.value,
+                })
+              }
+              required
+            />
+            <div className="field" style={{ margin: 0 }}>
+              <label>카테고리</label>
+              <select
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    category: e.target.value,
+                  })
+                }
+                required
+              >
+                <option value="">카테고리 선택</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="단가 (원)"
+              placeholder="예: 1500"
+              type="number"
+              min="0"
+              value={formData.price}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  price: e.target.value,
+                })
+              }
+              required
+            />
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) =>
+                  setFormData({ ...formData, is_active: e.target.checked })
+                }
+              />
+              <span>판매 활성화</span>
+            </label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "12px",
+                marginTop: "12px",
+              }}
+            >
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={handleModalClose}
+                disabled={submitting}
+              >
+                취소
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting
+                  ? "저장 중..."
+                  : modalType === "create"
+                    ? "등록"
+                    : "수정"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }

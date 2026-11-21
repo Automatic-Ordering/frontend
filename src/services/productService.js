@@ -48,3 +48,35 @@ export const getStoreProductsPage = async ({ page, limit, search } = {}) => {
 export const patchProductSafetyStock = async (productId, safetyStock) => {
   return unwrap(await api.patch(`/store/products/${productId}/safety_stock`, { safety_stock: safetyStock }));
 };
+
+/**
+ * 단일 상품 상세 조회
+ * GET /api/products/:productId
+ */
+export const getProductById = async (productId) => {
+  return unwrap(await api.get(`/products/${productId}`));
+};
+
+/**
+ * 신규 상품 등록
+ * POST /api/products
+ */
+export const createProduct = async (payload) => {
+  return unwrap(await api.post("/products", payload));
+};
+
+/**
+ * 기존 상품 정보 수정
+ * PATCH /api/products/:productId
+ */
+export const updateProduct = async (productId, payload) => {
+  return unwrap(await api.patch(`/products/${productId}`, payload));
+};
+
+/**
+ * 상품 삭제
+ * DELETE /api/products/:productId
+ */
+export const deleteProduct = async (productId) => {
+  return unwrap(await api.delete(`/products/${productId}`));
+};
