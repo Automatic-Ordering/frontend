@@ -28,6 +28,9 @@ const WARNING_LABELS = {
   NO_SAME_WEEKDAY_DATA: "동요일 판매 데이터 없음",
 };
 
+const getAvgDailySales = (item) =>
+  item.avg_daily_sales !== undefined ? item.avg_daily_sales : item.predicted_daily_sales ?? item.predicted_demand;
+
 const PAGE_SIZE = 20;
 
 const calculateShortage = (targetStock, currentStock) => {
@@ -329,7 +332,7 @@ export default function StoreOrderRecommendations() {
                     7일 합계
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
-                    일평균
+                    일평균 판매량
                   </th>
                   <th className="text-right font-medium text-xs text-muted-foreground uppercase tracking-wider">
                     예상(1일)
@@ -387,7 +390,7 @@ export default function StoreOrderRecommendations() {
                         {Number(item.predicted_demand * 7).toLocaleString()}
                       </td>
                       <td className="align-middle text-right">
-                        {Number(item.predicted_demand).toFixed(2)}
+                        {Number(getAvgDailySales(item)).toFixed(2)}
                       </td>
                       <td className="align-middle text-right">
                         {Number(item.predicted_demand).toLocaleString()}

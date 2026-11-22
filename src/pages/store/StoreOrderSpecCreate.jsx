@@ -6,7 +6,7 @@ import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import { formatAmount } from "../../components/orderSpec";
 import { getApiError } from "../../services/api";
-import { getRecommendations } from "../../services/orderService";
+import { getRecommendations, getOrderSettings } from "../../services/orderService";
 import { getStoreProducts } from "../../services/productService";
 import { createOrderSpec } from "../../services/orderSpecService";
 
@@ -27,6 +27,24 @@ const getRecentSales = (item) =>
       item.recent_sales ??
       item.weekly_sales_quantity,
   );
+
+const parseOrderUnitFromName = (productName) => {
+  if (!productName) return 1;
+  const match = productName.match(/(\d+)(?:개|입)$/);
+  return match ? Number(match[1]) : 1;
+};
+
+const getOrderUnit = (productId, productData, recommendation) => {
+  const product = productData?.find((p) => String(p.product_id) === String(productId));
+  if (product && product.order_unit && product.order_unit > 1) {
+    return product.order_unit;
+  }
+  const parsedFromName = parseOrderUnitFromName(product.product_name ?? "");
+  if (parsedFromName > 1) {
+    return parsedFromName;
+  }
+  return recommendation.order_unit ?? 1;
+};
 
 const fetchAllRecommendations = async () => {
   const firstPage = await getRecommendations({ page: 1, limit: 100 });
@@ -59,9 +77,10 @@ export default function StoreOrderSpecCreate() {
 
     const loadInitialData = async () => {
       try {
-        const [productData, recommendationData] = await Promise.all([
+        const [productData, recommendationData, orderSettings] = await Promise.all([
           getStoreProducts(),
           fetchAllRecommendations(),
+          getOrderSettings(),
         ]);
 
         if (cancelled) return;
@@ -76,21 +95,45 @@ export default function StoreOrderSpecCreate() {
           (item) => item.is_registered,
         );
 
+        const {
+          lead_time_days = 7,
+          safety_stock_days = 7,
+        } = orderSettings;
+
         setOrderItems(
           registeredProducts.map((product) => {
             const recommendation =
               recommendationsById.get(String(product.product_id)) ?? {};
+            const avgDailySales =
+              (recommendation.avg_daily_sales !== undefined
+                ? recommendation.avg_daily_sales
+                : 0) || 0;
             const currentStock = toNumber(
               recommendation.current_stock ?? product.current_stock,
             );
             const safetyStock = toNumber(
               recommendation.safety_stock ?? product.safety_stock,
             );
-            const recentSales = getRecentSales(recommendation) || getRecentSales(product);
             const recommendedQuantity = Math.max(
               0,
-              recentSales + safetyStock - currentStock,
+              Math.ceil(
+                avgDailySales * (lead_time_days + safety_stock_days),
+              ) - currentStock,
             );
+
+            const orderUnit = getOrderUnit(
+              product.product_id,
+              productData,
+              recommendation,
+            );
+
+            const recMultiplier =
+              recommendedQuantity > 0
+                ? Math.ceil(recommendedQuantity / orderUnit)
+                : 0;
+            const totalExpectedEa = recMultiplier * orderUnit;
+
+            const orderMultiplier = recommendation.order_multiplier ?? 1;
 
             return {
               product_id: product.product_id,
@@ -100,9 +143,13 @@ export default function StoreOrderSpecCreate() {
               price: toNumber(recommendation.price ?? product.price),
               current_stock: currentStock,
               safety_stock: safetyStock,
-              recent_7d_sales: recentSales,
+              avg_daily_sales: avgDailySales,
+              recent_7d_sales: getRecentSales(recommendation) || getRecentSales(product),
               recommended_quantity: recommendedQuantity,
-              quantity: recommendedQuantity,
+              quantity: recMultiplier,
+              order_multiplier: orderMultiplier,
+              total_expected_ea: totalExpectedEa,
+              order_unit: orderUnit,
             };
           }),
         );
@@ -184,13 +231,21 @@ export default function StoreOrderSpecCreate() {
       ),
     [pendingItems],
   );
+  const totalExpectedEa = useMemo(
+    () =>
+      pendingItems.reduce(
+        (sum, item) => sum + Number(item.total_expected_ea || 0),
+        0,
+      ),
+    [pendingItems],
+  );
 
   const updateQuantity = (productId, value) => {
     const normalizedValue = normalizeInteger(value);
     setOrderItems((previous) =>
       previous.map((item) =>
         String(item.product_id) === String(productId)
-          ? { ...item, quantity: normalizedValue }
+          ? { ...item, quantity: normalizedValue, total_expected_ea: normalizedValue * item.order_multiplier }
           : item,
       ),
     );
@@ -263,6 +318,12 @@ export default function StoreOrderSpecCreate() {
           tone="orange"
         />
         <StatCard
+          label="총 입고 예정 수량"
+          value={totalExpectedEa.toLocaleString()}
+          icon={ShoppingCart}
+          tone="purple"
+        />
+        <StatCard
           label="총 발주 금액"
           value={formatAmount(totalAmount)}
           icon={ShoppingCart}
@@ -312,9 +373,11 @@ export default function StoreOrderSpecCreate() {
                     <th>상품명</th>
                     <th style={{ textAlign: "right" }}>현재 재고</th>
                     <th style={{ textAlign: "right" }}>안전 재고</th>
-                    <th style={{ textAlign: "right" }}>최근 7일 판매량</th>
-                    <th style={{ textAlign: "right" }}>추천 발주량</th>
-                    <th style={{ textAlign: "center" }}>발주 수량</th>
+                    <th style={{ textAlign: "right" }}>일평균 판매량</th>
+                    <th style={{ textAlign: "center" }}>입수량</th>
+                    <th style={{ textAlign: "center" }}>추천 배수</th>
+                    <th style={{ textAlign: "center" }}>총 입고 예정 수량</th>
+                    <th style={{ textAlign: "center" }}>발주 배수</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -329,10 +392,16 @@ export default function StoreOrderSpecCreate() {
                         {item.safety_stock.toLocaleString()}개
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        {item.recent_7d_sales.toLocaleString()}개
+                        {Math.ceil(Number(item.avg_daily_sales) || 0)}
                       </td>
-                      <td style={{ textAlign: "right", fontWeight: 600 }}>
-                        {item.recommended_quantity.toLocaleString()}개
+                      <td style={{ textAlign: "center" }}>
+                        {item.order_unit}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {item.total_expected_ea.toLocaleString()}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <input
