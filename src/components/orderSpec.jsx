@@ -51,8 +51,23 @@ export const SpecStatusBadge = ({ status }) => (
 export const formatAmount = (value) =>
   `${Number(value ?? 0).toLocaleString("ko-KR")}원`;
 
-export const formatDateTime = (value) =>
-  value ? new Date(value).toLocaleString("ko-KR") : "-";
+export const formatDateTime = (value) => {
+    // value가 객체인 경우(이력 객체 등) - nested field 시도
+    if (typeof value === "object" && value !== null) {
+      const dateValue =
+        value.created_at ||
+        value.createdAt ||
+        value.order_date ||
+        value.ordered_at ||
+        value.date;
+      if (dateValue) return new Date(dateValue).toLocaleString("ko-KR");
+    }
+    // value가 문자열이거나 숫자인 경우( spec.request_date 등 직접 날짜 문자열)
+    if (typeof value === "string" || typeof value === "number") {
+      if (value) return new Date(value).toLocaleString("ko-KR");
+    }
+    return "-";
+  };
 
 const numberInputStyle = {
   width: "84px",

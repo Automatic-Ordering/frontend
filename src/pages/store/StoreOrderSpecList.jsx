@@ -123,7 +123,10 @@ export default function StoreOrderSpecList() {
       Object.fromEntries(
         (detail?.items ?? []).map((item) => [
           item.product_id,
-          String(item.order_quantity),
+          String(
+            Number(item.order_quantity) /
+              (item.order_unit || item.pack_size || 1),
+          ),
         ]),
       ),
     );
@@ -135,11 +138,13 @@ export default function StoreOrderSpecList() {
 
   const refreshList = () => loadSpecs({ targetPage: page });
 
-  const handleSaveItems = async () => {
+const handleSaveItems = async () => {
     setActionError("");
     const items = (detail?.items ?? []).map((item) => ({
       product_id: item.product_id,
-      quantity: Number(quantities[item.product_id] ?? 0),
+      quantity:
+        Number(quantities[item.product_id] || 0) *
+        (item.order_unit || item.pack_size || 1),
     }));
     if (items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
       setActionError("발주 수량은 1 이상의 정수로 입력하세요.");
@@ -153,7 +158,7 @@ export default function StoreOrderSpecList() {
       refreshList();
     } catch (err) {
       setActionError(
-        getApiError(err, "발주 수량 수정 중 오류가 발생했습니다."),
+        getApiError(err, "발주 수량 수정 중 오류가 발생했습니다.")
       );
     } finally {
       setActionLoading("");
@@ -395,7 +400,7 @@ export default function StoreOrderSpecList() {
             ) : null
           }
           itemsContent={
-            editing && detail ? (
+            detail ? (
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -409,7 +414,13 @@ export default function StoreOrderSpecList() {
                   </thead>
                   <tbody>
                     {detail.items.map((item) => {
-                      const quantity = Number(quantities[item.product_id] ?? 0);
+                      const savedQuantity =
+                        Number(quantities[item.product_id]) || 0;
+                      const orderUnit =
+                        item.order_unit || item.pack_size || 1;
+                      const computedMultiplier = Math.floor(
+                        savedQuantity / orderUnit,
+                      );
                       return (
                         <tr key={item.item_id}>
                           <td className="muted" style={{ fontFamily: "monospace" }}>
@@ -419,31 +430,28 @@ export default function StoreOrderSpecList() {
                             <strong>{item.product_name}</strong>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            {Number(item.unit_price).toLocaleString("ko-KR")}원
+                            {Number(item.unit_price).toLocaleString(
+                              "ko-KR",
+                            )}원
                           </td>
                           <td style={{ textAlign: "center" }}>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={quantities[item.product_id] ?? ""}
-                              onChange={(event) =>
-                                handleQuantityChange(
-                                  item.product_id,
-                                  event.target.value.replace(/[^0-9]/g, ""),
-                                )
-                              }
-                              disabled={Boolean(actionLoading)}
-                              style={{
-                                width: "84px",
-                                textAlign: "right",
-                                padding: "7px 9px",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "8px",
-                              }}
-                            />
+                            {savedQuantity > 0
+                              ? `${savedQuantity}개`
+                              : `${item.order_quantity ||
+                                  item.ordered_quantity ||
+                                  item.quantity ||
+                                  0}개`}
                           </td>
                           <td style={{ textAlign: "right", fontWeight: 600 }}>
-                            {formatAmount(quantity * Number(item.unit_price))}
+                            {formatAmount(
+                              Number(item.unit_price || 0) *
+                                Number(
+                                  item.order_quantity ||
+                                  item.ordered_quantity ||
+                                  item.quantity ||
+                                  0,
+                                ),
+                            )}
                           </td>
                         </tr>
                       );

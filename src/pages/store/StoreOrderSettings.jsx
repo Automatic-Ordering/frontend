@@ -8,6 +8,8 @@ import {
 } from "../../services/productService";
 import { getRecommendations } from "../../services/orderService";
 
+const PAGE_SIZE = 10;
+
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -36,6 +38,7 @@ const fetchAllRecommendations = async () => {
 export default function StoreOrderSettings() {
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
   const [bulkSafetyStock, setBulkSafetyStock] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -157,6 +160,10 @@ export default function StoreOrderSettings() {
     };
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory]);
+
   const categories = useMemo(
     () => [
       "ALL",
@@ -171,12 +178,17 @@ export default function StoreOrderSettings() {
     [products],
   );
 
-  const filteredProducts = useMemo(
+const filteredProducts = useMemo(
     () =>
       selectedCategory === "ALL"
         ? products
         : products.filter((item) => item.category === selectedCategory),
-    [products, selectedCategory],
+      [products, selectedCategory],
+  );
+
+  const pagedProducts = useMemo(
+    () => filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredProducts, currentPage],
   );
 
   const applyBulkSafetyStock = () => {
@@ -333,7 +345,7 @@ export default function StoreOrderSettings() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => (
+                  {pagedProducts.map((product) => (
                     <tr key={product.product_id}>
                       <td>{product.category}</td>
                       <td><strong>{product.product_name}</strong></td>
@@ -369,6 +381,84 @@ export default function StoreOrderSettings() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "16px",
+              }}
+            >
+              <div style={{ marginRight: "12px" }}>
+                <span>
+                  {filteredProducts.length > 0
+                    ? `${(currentPage - 1) * PAGE_SIZE + 1}~${
+                        Math.min(
+                          filteredProducts.length,
+                          currentPage * PAGE_SIZE,
+                        )
+                      }/${filteredProducts.length}`
+                    : "0~0/0"}
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={currentPage === 1 || saving}
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                style={{
+                  margin: "0 4px",
+                  padding: "6px 12px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  background: currentPage === 1 ? "#f9fafb" : "white",
+                }}
+              >
+                이전
+              </button>
+              <div style={{ margin: "0 4px" }}>
+                {Array.from(
+                  { length: Math.ceil(filteredProducts.length / PAGE_SIZE) || 1 },
+                  (_, i) => i + 1,
+                ).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    disabled={page === currentPage || saving}
+                    style={{
+                      margin: "0 2px",
+                      padding: "6px 12px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      background:
+                        page === currentPage ? "#e2e8f0" : "white",
+                      color: page === currentPage ? "white" : "black",
+                    }}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={
+                  currentPage >= Math.ceil(filteredProducts.length / PAGE_SIZE) ||
+                  saving
+                }
+                onClick={() => setCurrentPage((prev) => prev + 1)}
+                style={{
+                  margin: "0 4px",
+                  padding: "6px 12px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  background:
+                    currentPage >= Math.ceil(filteredProducts.length / PAGE_SIZE)
+                      ? "#f9fafb"
+                      : "white",
+                }}
+              >
+                다음
+              </button>
             </div>
           </>
         )}

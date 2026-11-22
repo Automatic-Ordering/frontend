@@ -318,7 +318,9 @@ export default function StoreReceipts() {
                           <strong>{row.product_name}</strong>
                         </td>
                         <td style={{ textAlign: "right" }}>
-                          {Number(row.order_quantity).toLocaleString("ko-KR")}
+                          {Number(row.order_quantity).toLocaleString(
+                            "ko-KR",
+                          )}
                         </td>
                         <td style={{ textAlign: "right" }}>
                           {Number(row.received_quantity).toLocaleString(
@@ -338,7 +340,9 @@ export default function StoreReceipts() {
                           }}
                         >
                           {row.difference > 0 ? "+" : ""}
-                          {Number(row.difference).toLocaleString("ko-KR")}
+                          {Number(row.difference).toLocaleString(
+                            "ko-KR",
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -413,10 +417,10 @@ export default function StoreReceipts() {
                         <td style={{ textAlign: "right" }}>
                           {Number(
                             item.order_quantity ??
-                              item.ordered_quantity ??
-                              item.quantity ??
-                              0,
-                          ).toLocaleString("ko-KR")}
+                            item.ordered_quantity ??
+                            item.quantity ??
+                            0,
+                          ).toLocaleString("ko-KR")}개
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <input

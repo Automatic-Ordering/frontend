@@ -95,64 +95,65 @@ export default function StoreOrderSpecCreate() {
           (item) => item.is_registered,
         );
 
-        const {
-          lead_time_days = 7,
-          safety_stock_days = 7,
-        } = orderSettings;
+const {
+              lead_time_days = 7,
+              safety_stock_days = 7,
+            } = orderSettings;
 
-        setOrderItems(
-          registeredProducts.map((product) => {
-            const recommendation =
-              recommendationsById.get(String(product.product_id)) ?? {};
-            const avgDailySales =
-              (recommendation.avg_daily_sales !== undefined
-                ? recommendation.avg_daily_sales
-                : 0) || 0;
-            const currentStock = toNumber(
-              recommendation.current_stock ?? product.current_stock,
+            setOrderItems(
+              registeredProducts.map((product) => {
+                const recommendation =
+                  recommendationsById.get(String(product.product_id)) ?? {};
+                const avgDailySales =
+                  (recommendation.avg_daily_sales !== undefined
+                    ? recommendation.avg_daily_sales
+                    : 0) || 0;
+                const currentStock = toNumber(
+                  recommendation.current_stock ?? product.current_stock,
+                );
+                const safetyStock = toNumber(
+                  recommendation.safety_stock ?? product.safety_stock,
+                );
+                const recommendedQuantity = Math.max(
+                  0,
+                  Math.ceil(
+                    avgDailySales * (lead_time_days + safety_stock_days),
+                  ) - currentStock,
+                );
+
+                const orderUnit = getOrderUnit(
+                  product.product_id,
+                  productData,
+                  recommendation,
+                );
+
+                const recMultiplier =
+                  recommendedQuantity > 0
+                    ? Math.ceil(recommendedQuantity / orderUnit)
+                    : 0;
+                const totalExpectedEa = recMultiplier * orderUnit;
+
+                const orderMultiplier = recommendation.order_multiplier ?? 1;
+
+                return {
+                  product_id: product.product_id,
+                  category: recommendation.category ?? product.category ?? "미분류",
+                  product_name:
+                    recommendation.product_name ?? product.product_name,
+                  price: toNumber(recommendation.price ?? product.price),
+                  current_stock: currentStock,
+                  safety_stock: safetyStock,
+                  avg_daily_sales: avgDailySales,
+                  recent_7d_sales: getRecentSales(recommendation) || getRecentSales(product),
+                  recommended_quantity: recommendedQuantity,
+                  quantity: recMultiplier,
+                  order_unit: orderUnit,
+                  order_multiplier: orderMultiplier,
+                  total_expected_ea: totalExpectedEa,
+                  total_quantity: recMultiplier * orderUnit,
+                };
+              }),
             );
-            const safetyStock = toNumber(
-              recommendation.safety_stock ?? product.safety_stock,
-            );
-            const recommendedQuantity = Math.max(
-              0,
-              Math.ceil(
-                avgDailySales * (lead_time_days + safety_stock_days),
-              ) - currentStock,
-            );
-
-            const orderUnit = getOrderUnit(
-              product.product_id,
-              productData,
-              recommendation,
-            );
-
-            const recMultiplier =
-              recommendedQuantity > 0
-                ? Math.ceil(recommendedQuantity / orderUnit)
-                : 0;
-            const totalExpectedEa = recMultiplier * orderUnit;
-
-            const orderMultiplier = recommendation.order_multiplier ?? 1;
-
-            return {
-              product_id: product.product_id,
-              category: recommendation.category ?? product.category ?? "미분류",
-              product_name:
-                recommendation.product_name ?? product.product_name,
-              price: toNumber(recommendation.price ?? product.price),
-              current_stock: currentStock,
-              safety_stock: safetyStock,
-              avg_daily_sales: avgDailySales,
-              recent_7d_sales: getRecentSales(recommendation) || getRecentSales(product),
-              recommended_quantity: recommendedQuantity,
-              quantity: recMultiplier,
-              order_multiplier: orderMultiplier,
-              total_expected_ea: totalExpectedEa,
-              order_unit: orderUnit,
-            };
-          }),
-        );
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -217,7 +218,7 @@ export default function StoreOrderSpecCreate() {
   const totalQuantity = useMemo(
     () =>
       pendingItems.reduce(
-        (sum, item) => sum + Number(item.quantity),
+        (sum, item) => sum + Number(item.total_quantity || 0),
         0,
       ),
     [pendingItems],
@@ -226,7 +227,7 @@ export default function StoreOrderSpecCreate() {
     () =>
       pendingItems.reduce(
         (sum, item) =>
-          sum + Number(item.quantity) * Number(item.price || 0),
+          sum + Number(item.total_quantity || 0) * Number(item.price || 0),
         0,
       ),
     [pendingItems],
@@ -245,7 +246,7 @@ export default function StoreOrderSpecCreate() {
     setOrderItems((previous) =>
       previous.map((item) =>
         String(item.product_id) === String(productId)
-          ? { ...item, quantity: normalizedValue, total_expected_ea: normalizedValue * item.order_multiplier }
+          ? { ...item, quantity: normalizedValue, total_quantity: normalizedValue * item.order_unit, total_expected_ea: normalizedValue * item.order_unit }
           : item,
       ),
     );
@@ -280,7 +281,7 @@ export default function StoreOrderSpecCreate() {
       const spec = await createOrderSpec(
         pendingItems.map((item) => ({
           product_id: Number(item.product_id),
-          quantity: normalizeInteger(item.quantity),
+          quantity: item.total_quantity,
         })),
       );
       navigate("/store/orders/specs", {
@@ -375,9 +376,9 @@ export default function StoreOrderSpecCreate() {
                     <th style={{ textAlign: "right" }}>안전 재고</th>
                     <th style={{ textAlign: "right" }}>일평균 판매량</th>
                     <th style={{ textAlign: "center" }}>입수량</th>
-                    <th style={{ textAlign: "center" }}>추천 배수</th>
-                    <th style={{ textAlign: "center" }}>총 입고 예정 수량</th>
                     <th style={{ textAlign: "center" }}>발주 배수</th>
+                    <th style={{ textAlign: "center" }}>총 발주 수량</th>
+                    <th style={{ textAlign: "right" }}>발주 금액</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -396,12 +397,6 @@ export default function StoreOrderSpecCreate() {
                       </td>
                       <td style={{ textAlign: "center" }}>
                         {item.order_unit}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {item.quantity}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {item.total_expected_ea.toLocaleString()}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <input
@@ -424,6 +419,12 @@ export default function StoreOrderSpecCreate() {
                             borderRadius: "8px",
                           }}
                         />
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {item.total_quantity.toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {formatAmount(item.price * item.total_quantity)}
                       </td>
                     </tr>
                   ))}
