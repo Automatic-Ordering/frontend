@@ -36,3 +36,5 @@ export const deleteStore = async (storeId) =>
   api.delete(`/admin/stores/${storeId}`);
 export const resetStorePassword = async (storeId) =>
   unwrap(await api.patch(`/admin/stores/${storeId}/password/reset`));
+export const getStoreAdmins = () =>
+  api.get("/admin/stores/admins").then((res) => res.data);

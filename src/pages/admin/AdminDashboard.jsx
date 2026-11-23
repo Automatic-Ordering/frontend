@@ -9,25 +9,38 @@ import {
   StatCard,
 } from "../../components/ui";
 import { Header } from "../../components/layout";
-import { getStoreId, getStores } from "../../services/storeService";
+import {
+  getStoreAdmins,
+  getStoreId,
+  getStores,
+} from "../../services/storeService";
 import { getApiError } from "../../services/api";
 
 export default function AdminDashboard() {
   const [stores, setStores] = useState([]);
+  const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   useEffect(() => {
-    getStores()
-      .then((data) =>
-        setStores(Array.isArray(data) ? data : data?.stores || []),
-      )
+    Promise.all([getStores(), getStoreAdmins()])
+      .then(([storeData, adminData]) => {
+        setStores(
+          Array.isArray(storeData) ? storeData : storeData?.stores || [],
+        );
+        setAdmins(
+          Array.isArray(adminData) ? adminData : adminData?.admins || [],
+        );
+      })
       .catch((err) => setError(getApiError(err)))
       .finally(() => setLoading(false));
   }, []);
+
   const active = stores.filter(
     (store) => String(store.status || "").toUpperCase() === "ACTIVE",
   ).length;
   const suspended = stores.length - active;
+
   return (
     <>
       <Header
@@ -54,7 +67,12 @@ export default function AdminDashboard() {
               icon={CircleAlert}
               tone="orange"
             />
-            <StatCard label="관리자" value="-" icon={Users} tone="purple" />
+            <StatCard
+              label="관리자"
+              value={admins.length}
+              icon={Users}
+              tone="purple"
+            />
           </div>
           <div className="content-grid">
             <Card>
