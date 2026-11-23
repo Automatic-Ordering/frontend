@@ -11,11 +11,15 @@ import {
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import {
-  SPEC_STATUS_OPTIONS,
   SpecDetailModal,
+  SpecItemsTable,
   SpecStatusBadge,
-  formatAmount,
 } from "../../components/orderSpec";
+import {
+  SPEC_STATUS_OPTIONS,
+  formatAmount,
+  formatDateTime,
+} from "../../utils/orderSpecUtils";
 import { getApiError } from "../../services/api";
 import {
   cancelOrderSpec,
@@ -78,8 +82,9 @@ export default function StoreOrderSpecList() {
     setDetailError("");
     try {
       const data = await getOrderSpecDetail(specId);
-      setDetail(data);
-      return data;
+      const resolved = data?.spec ?? data?.item ?? data?.data ?? data;
+      setDetail(resolved);
+      return resolved;
     } catch (err) {
       setDetailError(
         getApiError(err, "발주 명세서를 불러오는 중 오류가 발생했습니다."),
@@ -123,10 +128,7 @@ export default function StoreOrderSpecList() {
       Object.fromEntries(
         (detail?.items ?? []).map((item) => [
           item.product_id,
-          String(
-            Number(item.order_quantity) /
-              (item.order_unit || item.pack_size || 1),
-          ),
+          String(item.order_quantity ?? 0),
         ]),
       ),
     );
@@ -138,15 +140,15 @@ export default function StoreOrderSpecList() {
 
   const refreshList = () => loadSpecs({ targetPage: page });
 
-const handleSaveItems = async () => {
+  const handleSaveItems = async () => {
     setActionError("");
     const items = (detail?.items ?? []).map((item) => ({
       product_id: item.product_id,
-      quantity:
-        Number(quantities[item.product_id] || 0) *
-        (item.order_unit || item.pack_size || 1),
+      quantity: Number(quantities[item.product_id] || 0),
     }));
-    if (items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+    if (
+      items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)
+    ) {
       setActionError("발주 수량은 1 이상의 정수로 입력하세요.");
       return;
     }
@@ -158,7 +160,7 @@ const handleSaveItems = async () => {
       refreshList();
     } catch (err) {
       setActionError(
-        getApiError(err, "발주 수량 수정 중 오류가 발생했습니다.")
+        getApiError(err, "발주 수량 수정 중 오류가 발생했습니다."),
       );
     } finally {
       setActionLoading("");
@@ -189,7 +191,11 @@ const handleSaveItems = async () => {
 
   const handleCancel = async () => {
     setActionError("");
-    if (!window.confirm("발주 명세서를 취소하시겠습니까? 취소 후에는 되돌릴 수 없습니다.")) {
+    if (
+      !window.confirm(
+        "발주 명세서를 취소하시겠습니까? 취소 후에는 되돌릴 수 없습니다.",
+      )
+    ) {
       return;
     }
     setActionLoading("cancel");
@@ -199,7 +205,9 @@ const handleSaveItems = async () => {
       await loadDetail(detail.order_spec_id);
       refreshList();
     } catch (err) {
-      setActionError(getApiError(err, "발주 명세서 취소 중 오류가 발생했습니다."));
+      setActionError(
+        getApiError(err, "발주 명세서 취소 중 오류가 발생했습니다."),
+      );
     } finally {
       setActionLoading("");
     }
@@ -341,12 +349,10 @@ const handleSaveItems = async () => {
                       {formatAmount(spec.total_amount)}
                     </td>
                     <td className="muted">
-                      {spec.request_date
-                        ? new Date(spec.request_date).toLocaleString("ko-KR")
-                        : "-"}
+                      {formatDateTime(spec.confirmed_at ?? spec.request_date ?? spec.requestDate)}
                     </td>
                     <td className="muted">
-                      {new Date(spec.created_at).toLocaleString("ko-KR")}
+                      {formatDateTime(spec.created_at ?? spec.createdAt)}
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <button
@@ -401,64 +407,13 @@ const handleSaveItems = async () => {
           }
           itemsContent={
             detail ? (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>상품 코드</th>
-                      <th>상품명</th>
-                      <th style={{ textAlign: "right" }}>단가</th>
-                      <th style={{ textAlign: "center" }}>발주 수량</th>
-                      <th style={{ textAlign: "right" }}>금액</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.items.map((item) => {
-                      const savedQuantity =
-                        Number(quantities[item.product_id]) || 0;
-                      const orderUnit =
-                        item.order_unit || item.pack_size || 1;
-                      const computedMultiplier = Math.floor(
-                        savedQuantity / orderUnit,
-                      );
-                      return (
-                        <tr key={item.item_id}>
-                          <td className="muted" style={{ fontFamily: "monospace" }}>
-                            #{item.product_id}
-                          </td>
-                          <td>
-                            <strong>{item.product_name}</strong>
-                          </td>
-                          <td style={{ textAlign: "right" }}>
-                            {Number(item.unit_price).toLocaleString(
-                              "ko-KR",
-                            )}원
-                          </td>
-                          <td style={{ textAlign: "center" }}>
-                            {savedQuantity > 0
-                              ? `${savedQuantity}개`
-                              : `${item.order_quantity ||
-                                  item.ordered_quantity ||
-                                  item.quantity ||
-                                  0}개`}
-                          </td>
-                          <td style={{ textAlign: "right", fontWeight: 600 }}>
-                            {formatAmount(
-                              Number(item.unit_price || 0) *
-                                Number(
-                                  item.order_quantity ||
-                                  item.ordered_quantity ||
-                                  item.quantity ||
-                                  0,
-                                ),
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <SpecItemsTable
+                items={detail.items}
+                quantities={editing ? quantities : undefined}
+                onQuantityChange={editing ? handleQuantityChange : undefined}
+                showReceived={Boolean(detail.received_at)}
+                disabled={Boolean(actionLoading)}
+              />
             ) : undefined
           }
           footer={
@@ -495,8 +450,12 @@ const handleSaveItems = async () => {
                 )}
                 {detail.order_status === "PENDING_RECEIPT" && (
                   <>
-                    <span className="muted" style={{ marginRight: "auto", fontSize: "13px" }}>
-                      입고 대기 중입니다. 입고 관리 화면에서 실제 입고 수량을 입력하세요.
+                    <span
+                      className="muted"
+                      style={{ marginRight: "auto", fontSize: "13px" }}
+                    >
+                      입고 대기 중입니다. 입고 관리 화면에서 실제 입고 수량을
+                      입력하세요.
                     </span>
                     <Link
                       to="/store/orders/receipts"
@@ -549,7 +508,7 @@ const handleSaveItems = async () => {
           }
         >
           {actionError && (
-            <div className="alert alert-error" style={{ marginBottom: "14px" }}>
+            <div className="alert alert-error" style={{ marginTop: "14px" }}>
               {actionError}
             </div>
           )}

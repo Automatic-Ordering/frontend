@@ -4,7 +4,7 @@ import { ClipboardList, ShoppingCart } from "lucide-react";
 import { Button, Card, Loading, StatCard } from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
-import { formatAmount } from "../../components/orderSpec";
+import { formatAmount } from "../../utils/orderSpecUtils";
 import { getApiError } from "../../services/api";
 import { getRecommendations, getOrderSettings } from "../../services/orderService";
 import { getStoreProducts } from "../../services/productService";

@@ -1,73 +1,17 @@
 import { AlertTriangle } from "lucide-react";
 import { Button, EmptyState, Loading } from "./ui";
-
-export const SPEC_STATUSES = [
-  "DRAFT",
-  "PENDING_RECEIPT",
-  "REQUESTED",
-  "APPROVED",
-  "REJECTED",
-  "ORDERED",
-  "RECEIVED",
-  "CANCELLED",
-];
-
-export const SPEC_STATUS_LABELS = {
-  DRAFT: "임시 저장",
-  PENDING_RECEIPT: "입고 대기",
-  REQUESTED: "승인 대기",
-  APPROVED: "승인 완료",
-  REJECTED: "반려",
-  ORDERED: "발주서 발행",
-  RECEIVED: "입고 완료",
-  CANCELLED: "취소",
-};
-
-export const SPEC_STATUS_BADGE_STYLES = {
-  DRAFT: { background: "#f1f5f9", color: "#475569" },
-  PENDING_RECEIPT: { background: "#fef3c7", color: "#b45309" },
-  REQUESTED: { background: "#fef3c7", color: "#b45309" },
-  APPROVED: { background: "#dbeafe", color: "#1d4ed8" },
-  REJECTED: { background: "#fee2e2", color: "#b91c1c" },
-  ORDERED: { background: "#ede9fe", color: "#6d28d9" },
-  RECEIVED: { background: "#dcfce7", color: "#15803d" },
-  CANCELLED: { background: "#f1f5f9", color: "#64748b" },
-};
-
-export const SPEC_STATUS_OPTIONS = [
-  { value: "", label: "전체" },
-  ...SPEC_STATUSES.map((status) => ({
-    value: status,
-    label: SPEC_STATUS_LABELS[status],
-  })),
-];
+import {
+  SPEC_STATUS_BADGE_STYLES,
+  SPEC_STATUS_LABELS,
+  formatAmount,
+  formatDateTime,
+} from "../utils/orderSpecUtils";
 
 export const SpecStatusBadge = ({ status }) => (
   <span className="badge" style={SPEC_STATUS_BADGE_STYLES[status] || {}}>
     {SPEC_STATUS_LABELS[status] || status}
   </span>
 );
-
-export const formatAmount = (value) =>
-  `${Number(value ?? 0).toLocaleString("ko-KR")}원`;
-
-export const formatDateTime = (value) => {
-    // value가 객체인 경우(이력 객체 등) - nested field 시도
-    if (typeof value === "object" && value !== null) {
-      const dateValue =
-        value.created_at ||
-        value.createdAt ||
-        value.order_date ||
-        value.ordered_at ||
-        value.date;
-      if (dateValue) return new Date(dateValue).toLocaleString("ko-KR");
-    }
-    // value가 문자열이거나 숫자인 경우( spec.request_date 등 직접 날짜 문자열)
-    if (typeof value === "string" || typeof value === "number") {
-      if (value) return new Date(value).toLocaleString("ko-KR");
-    }
-    return "-";
-  };
 
 const numberInputStyle = {
   width: "84px",
@@ -79,7 +23,7 @@ const numberInputStyle = {
 
 /**
  * 발주 명세서 상품 목록 테이블
- * quantities를 넘기면 발주 수량을 입력받아 금액/합계를 다시 계산합니다.
+ * - quantities를 넘기면 발주 수량을 입력받아 금액/합계를 다시 계산합니다.
  */
 export function SpecItemsTable({
   items,
@@ -169,11 +113,15 @@ export function SpecItemsTable({
         {rows.length > 0 && (
           <tfoot>
             <tr>
-              <td colSpan={showReceived ? 4 : 4} className="muted">
+              <td colSpan={4} className="muted">
                 총 발주 금액
               </td>
               <td
-                style={{ textAlign: "right", fontWeight: 700, fontSize: "15px" }}
+                style={{
+                  textAlign: "right",
+                  fontWeight: 700,
+                  fontSize: "15px",
+                }}
               >
                 {total.toLocaleString("ko-KR")}원
               </td>
@@ -223,33 +171,16 @@ export function SpecSummaryGrid({ spec, showStore = true }) {
       </div>
       <div style={summaryCellStyle()}>
         <span style={summaryLabelStyle}>발주 요청 일시</span>
-        <span>{formatDateTime(spec.request_date)}</span>
+        <span>
+          {formatDateTime(
+            spec.confirmed_at ?? spec.request_date ?? spec.requestDate,
+          )}
+        </span>
       </div>
       <div style={summaryCellStyle()}>
         <span style={summaryLabelStyle}>생성 일시</span>
-        <span>{formatDateTime(spec.created_at)}</span>
+        <span>{formatDateTime(spec.created_at ?? spec.createdAt)}</span>
       </div>
-      {spec.approved_at && (
-        <div style={summaryCellStyle()}>
-          <span style={summaryLabelStyle}>승인 일시</span>
-          <span>{formatDateTime(spec.approved_at)}</span>
-        </div>
-      )}
-      {spec.rejected_at && (
-        <div style={summaryCellStyle()}>
-          <span style={summaryLabelStyle}>반려 일시</span>
-          <span>{formatDateTime(spec.rejected_at)}</span>
-        </div>
-      )}
-      {spec.issued_order_number && (
-        <div style={summaryCellStyle()}>
-          <span style={summaryLabelStyle}>발주서 번호</span>
-          <strong style={{ fontFamily: "monospace" }}>
-            {spec.issued_order_number}
-          </strong>
-          <span>{formatDateTime(spec.issued_at)}</span>
-        </div>
-      )}
       {spec.received_at && (
         <div style={summaryCellStyle()}>
           <span style={summaryLabelStyle}>입고 완료 일시</span>
@@ -261,41 +192,67 @@ export function SpecSummaryGrid({ spec, showStore = true }) {
 }
 
 /** 상태 변경 이력 목록 */
-export function SpecHistoryList({ histories }) {
-  const rows = histories ?? [];
+export function SpecHistoryList({ histories, spec }) {
+  const rows =
+    histories ??
+    spec?.statusHistories ??
+    spec?.status_histories ??
+    spec?.histories ??
+    [];
+
   if (!rows.length) {
     return <p className="muted">상태 변경 이력이 없습니다.</p>;
   }
+
   return (
     <div style={{ display: "grid", gap: "8px" }}>
-      {rows.map((history) => (
-        <div
-          key={history.history_id}
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "13px",
-            padding: "8px 10px",
-            background: "#f8fafc",
-            borderRadius: "8px",
-          }}
-        >
-          <span>
-            {history.from_status
-              ? `${SPEC_STATUS_LABELS[history.from_status] || history.from_status} →`
-              : "생성 →"}{" "}
-            <strong>
-              {SPEC_STATUS_LABELS[history.to_status] || history.to_status}
-            </strong>
-          </span>
-          {history.note && <span className="muted">({history.note})</span>}
-          <small className="muted" style={{ marginLeft: "auto" }}>
-            {formatDateTime(history.created_at)}
-          </small>
-        </div>
-      ))}
+      {rows.map((history, index) => {
+        const fromStatus =
+          history.from_status ??
+          history.fromStatus ??
+          history.previous_status ??
+          history.previousStatus;
+        const toStatus =
+          history.to_status ??
+          history.toStatus ??
+          history.status ??
+          history.new_status ??
+          history.newStatus;
+        const changedAt =
+          history.created_at ??
+          history.createdAt ??
+          history.changed_at ??
+          history.changedAt;
+
+        return (
+          <div
+            key={history.history_id ?? history.id ?? index}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "13px",
+              padding: "8px 10px",
+              background: "#f8fafc",
+              borderRadius: "8px",
+            }}
+          >
+            <span>
+              {fromStatus
+                ? `${SPEC_STATUS_LABELS[fromStatus] || fromStatus} →`
+                : "생성 →"}{" "}
+              <strong>
+                {toStatus ? SPEC_STATUS_LABELS[toStatus] || toStatus : "-"}
+              </strong>
+            </span>
+            {history.note && <span className="muted">({history.note})</span>}
+            <small className="muted" style={{ marginLeft: "auto" }}>
+              {formatDateTime(changedAt)}
+            </small>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -308,8 +265,8 @@ const sectionTitleStyle = {
 
 /**
  * 발주 명세서 상세 모달 (요약 + 상품 목록 + 상태 이력)
- * spec / loading / error는 페이지에서 직접 조회해 전달합니다.
- * itemsContent를 넘기면 기본 상품 테이블 대신 해당 내용이 표시됩니다.
+ * - spec / loading / error는 페이지에서 직접 조회해 전달합니다.
+ * - itemsContent를 넘기면 기본 상품 테이블 대신 해당 내용이 표시됩니다.
  */
 export function SpecDetailModal({
   title = "발주 명세서 상세",
@@ -324,6 +281,9 @@ export function SpecDetailModal({
   itemsContent,
   children,
 }) {
+  const resolvedHistories =
+    spec?.statusHistories ?? spec?.status_histories ?? spec?.histories;
+
   return (
     <div
       className="modal-overlay"
@@ -414,7 +374,7 @@ export function SpecDetailModal({
                 />
               )}
               <p style={sectionTitleStyle}>상태 변경 이력</p>
-              <SpecHistoryList histories={spec.status_histories} />
+              <SpecHistoryList histories={resolvedHistories} spec={spec} />
               {children}
             </>
           ) : null}

@@ -10,7 +10,8 @@ import {
 } from "../../components/ui";
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
-import { SpecStatusBadge, formatAmount } from "../../components/orderSpec";
+import { SpecStatusBadge } from "../../components/orderSpec";
+import { formatAmount } from "../../utils/orderSpecUtils";
 import { getApiError } from "../../services/api";
 import {
   getPendingReceipts,
@@ -206,7 +207,6 @@ export default function StoreReceipts() {
               <thead>
                 <tr>
                   <th>발주 번호</th>
-                  <th>발주서 번호</th>
                   <th style={{ textAlign: "right" }}>상품 수</th>
                   <th style={{ textAlign: "right" }}>총 발주 금액</th>
                   <th style={{ textAlign: "center" }}>상태</th>
@@ -219,9 +219,6 @@ export default function StoreReceipts() {
                   <tr key={spec.order_spec_id}>
                     <td className="muted" style={{ fontFamily: "monospace" }}>
                       {spec.order_number}
-                    </td>
-                    <td className="muted" style={{ fontFamily: "monospace" }}>
-                      {spec.issued_order_number}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       {Number(spec.item_count ?? 0).toLocaleString("ko-KR")}
@@ -373,12 +370,6 @@ export default function StoreReceipts() {
                 }}
               >
                 <SpecStatusBadge status={detail.order_status} />
-                <span className="muted" style={{ fontSize: "13px" }}>
-                  발주서 번호:{" "}
-                  <strong style={{ fontFamily: "monospace" }}>
-                    {detail.issued_order_number}
-                  </strong>
-                </span>
                 <span className="muted" style={{ fontSize: "13px" }}>
                   총 발주 금액:{" "}
                   <strong>{formatAmount(detail.total_amount)}</strong>

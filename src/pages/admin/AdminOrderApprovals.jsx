@@ -10,11 +10,14 @@ import {
 import Pagination from "../../components/Pagination";
 import { Header } from "../../components/layout";
 import {
-  SPEC_STATUS_OPTIONS,
   SpecDetailModal,
-  SpecStatusBadge,
-  formatAmount,
 } from "../../components/orderSpec";
+import {
+  SPEC_STATUS_OPTIONS,
+  formatAmount,
+  formatDateTime,
+  SpecStatusBadge,
+} from "../../utils/orderSpecUtils";
 import { getApiError } from "../../services/api";
 import {
   getAdminOrderSpecDetail,
@@ -83,7 +86,7 @@ export default function AdminOrderApprovals() {
     setDetailError("");
     try {
       const data = await getAdminOrderSpecDetail(specId);
-      setDetail(data);
+      setDetail(data?.spec ?? data?.item ?? data?.data ?? data);
     } catch (err) {
       setDetailError(
         getApiError(err, "발주 명세서를 불러오는 중 오류가 발생했습니다."),
@@ -244,9 +247,7 @@ export default function AdminOrderApprovals() {
                       {formatAmount(spec.total_amount)}
                     </td>
                     <td className="muted">
-                      {spec.request_date
-                        ? new Date(spec.request_date).toLocaleString("ko-KR")
-                        : "-"}
+                      {formatDateTime(spec.confirmed_at ?? spec.request_date ?? spec.requestDate)}
                     </td>
                     <td style={{ textAlign: "center" }}>
                       <div

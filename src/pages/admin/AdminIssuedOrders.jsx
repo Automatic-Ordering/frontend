@@ -189,7 +189,6 @@ export default function AdminIssuedOrders() {
               <thead>
                 <tr>
                   <th>발주 번호</th>
-                  <th>발주서 번호</th>
                   <th>점포명</th>
                   <th style={{ textAlign: "center" }}>상태</th>
                   <th style={{ textAlign: "right" }}>상품 수</th>
@@ -203,9 +202,6 @@ export default function AdminIssuedOrders() {
                   <tr key={spec.order_spec_id}>
                     <td className="muted" style={{ fontFamily: "monospace" }}>
                       {spec.order_number}
-                    </td>
-                    <td className="muted" style={{ fontFamily: "monospace" }}>
-                      {spec.issued_order_number ?? "-"}
                     </td>
                     <td>
                       <strong>{spec.store_name ?? "-"}</strong>
